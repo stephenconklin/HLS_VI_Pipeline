@@ -186,21 +186,21 @@ A 10-tile study area with 5 years of data (bi-weekly acquisitions) can require *
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/stephenconklin/sandbox.git
-cd sandbox
+git clone https://github.com/stephenconklin/HLS_VI_Pipeline.git
+cd HLS_VI_Pipeline
 ```
 
 ### 2. Create the Conda Environment
 
 ```bash
-conda env create -f HLS_VI_Pipeline/environment.yml
+conda env create -f environment.yml
 conda activate hls_pipeline
 ```
 
 > **Tip:** [Mamba](https://mamba.readthedocs.io/) resolves conda environments significantly faster than conda:
 >
 > ```bash
-> mamba env create -f HLS_VI_Pipeline/environment.yml
+> mamba env create -f environment.yml
 > ```
 
 ### 3. Verify the Installation
@@ -213,7 +213,7 @@ python -c "import rasterio, xarray, rioxarray, geopandas; print('Environment OK'
 
 ## Configuration
 
-All pipeline parameters are set in `HLS_VI_Pipeline/config.env`. This file is sourced by `hls_pipeline.sh` before each step — no environment variables need to be exported manually.
+All pipeline parameters are set in `config.env`. This file is sourced by `hls_pipeline.sh` before each step — no environment variables need to be exported manually.
 
 ### Paths
 
@@ -348,7 +348,7 @@ TARGET_CRS="EPSG:6350"  # Output CRS (default: NAD83 Conus Albers Equal Area)
 
 A minimal example to process a single summer season for two tiles:
 
-**1. Edit `HLS_VI_Pipeline/config.env`:**
+**1. Edit `config.env`:**
 
 ```bash
 BASE_DIR="/path/to/your/output"
@@ -363,7 +363,6 @@ NUM_WORKERS=4
 
 ```bash
 conda activate hls_pipeline
-cd HLS_VI_Pipeline
 bash hls_pipeline.sh
 ```
 
@@ -376,7 +375,6 @@ The pipeline will print a run summary, prompt you to confirm the storage estimat
 ### Full Run
 
 ```bash
-cd HLS_VI_Pipeline
 bash hls_pipeline.sh
 ```
 
@@ -603,7 +601,7 @@ Verify your `~/.netrc` credentials, file permissions (`chmod 600 ~/.netrc`), and
 
 ### `syntax error` or unexpected token in `hls_pipeline.sh`
 
-Verify that `config.env` is present in the `HLS_VI_Pipeline/` directory and that all required variables are set. The pipeline has been tested on macOS (ZSH) and Linux.
+Verify that `config.env` is present in the repository root and that all required variables are set. The pipeline has been tested on macOS (ZSH) and Linux.
 
 ### Out-of-memory errors during Steps 04, 05, or 09
 

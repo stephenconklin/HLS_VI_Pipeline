@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment Setup
 
 ```bash
-conda env create -f HLS_VI_Pipeline/environment.yml
+conda env create -f environment.yml
 conda activate hls_pipeline
 export PYTHONUNBUFFERED=1
 ```
@@ -13,7 +13,6 @@ export PYTHONUNBUFFERED=1
 ## Running the Pipeline
 
 ```bash
-cd HLS_VI_Pipeline
 bash hls_pipeline.sh
 ```
 
@@ -23,7 +22,7 @@ The `STEPS` variable in `config.env` controls which steps run. Valid values:
 
 ## Configuration
 
-All pipeline parameters live in `HLS_VI_Pipeline/config.env`. Key sections:
+All pipeline parameters live in `config.env`. Key sections:
 - **Paths**: `BASE_DIR`, `LOG_DIR`, `RAW_HLS_DIR`, `VI_OUTPUT_DIR`, `NETCDF_DIR`, `REPROJECTED_DIR`, `REPROJECTED_DIR_OUTLIERS`, `MOSAIC_DIR`, `TIMESLICE_OUTPUT_DIR`, `OUTLIER_GPKG_DIR`
 - **Processing**: `NUM_WORKERS`, `CHUNK_SIZE`, `TARGET_CRS` (default `EPSG:6350`)
 - **VI selection**: `PROCESSED_VIS` — space-separated list of `NDVI`, `EVI2`, `NIRv`
