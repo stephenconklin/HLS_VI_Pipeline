@@ -24,13 +24,13 @@ The `STEPS` variable in `config.env` controls which steps run. Valid values:
 
 All pipeline parameters live in `config.env`. Key sections:
 - **Paths**: `BASE_DIR`, `LOG_DIR`, `RAW_HLS_DIR`, `VI_OUTPUT_DIR`, `NETCDF_DIR`, `REPROJECTED_DIR`, `REPROJECTED_DIR_OUTLIERS`, `MOSAIC_DIR`, `TIMESLICE_OUTPUT_DIR`, `OUTLIER_GPKG_DIR`
-- **Processing**: `NUM_WORKERS`, `CHUNK_SIZE`, `TARGET_CRS` (default `EPSG:6350`)
+- **Processing**: `NUM_WORKERS`, `CHUNK_SIZE`, `TARGET_CRS` (default `EPSG:6350` — NAD83 Conus Albers, 30 m output resolution)
 - **VI selection**: `PROCESSED_VIS` — space-separated list of `NDVI`, `EVI2`, `NIRv`
 - **Fmask masking**: Individual boolean flags for cirrus, cloud, adjacent cloud, shadow, snow/ice, water, and aerosol mode (`NONE`/`HIGH`/`MODERATE`/`LOW`)
-- **Valid ranges**: Per-VI outlier bounds via `VALID_RANGE_NDVI`, `VALID_RANGE_EVI2`, `VALID_RANGE_NIRv` (format: `"min,max"`, e.g., `"-1,1"`)
+- **Valid ranges**: Per-VI outlier bounds via `VALID_RANGE_NDVI`, `VALID_RANGE_EVI2`, `VALID_RANGE_NIRv` (format: `"min,max"`; defaults: NDVI `"-1,1"`, EVI2 `"-1,2"`, NIRv `"-0.5,1"`)
 - **Tile list** (`HLS_TILES`): Space-separated MGRS tile IDs enforced across all steps (02–10); if unset, no filter is applied
-- **Download cycles**: Date ranges
-- **Time-series windows**: Named ranges in `label:start|end` format (e.g., `Winter_2015_2016:2015-12-01|2016-03-31`)
+- **Download cycles**: Date ranges in `YYYY-MM-DD|YYYY-MM-DD` format
+- **Time-series windows**: `TIMESLICE_WINDOWS` — space-separated `label:YYYY-MM-DD|YYYY-MM-DD` tokens (labels: alphanumeric + underscores, start ≤ end)
 
 Python scripts read all configuration via `os.environ.get()` with fallback defaults — `config.env` is sourced by `hls_pipeline.sh` before dispatching each step.
 
@@ -53,6 +53,18 @@ The pipeline is a 10-step sequential workflow for processing HLS (Harmonized Lan
 
 `hls_pipeline.sh` is the master orchestrator: it sources `config.env`, validates that required bands are configured for each requested VI before any step runs, then dispatches the appropriate scripts.
 
+### Data Flow
+
+```
+NASA CMR API → 01 (raw L30/S30 + Fmask)
+→ 02 (VI GeoTIFFs per granule, Fmask-masked)
+→ 03 (per-tile CF-1.8 NetCDF time-series)
+├── → 04 (mean tiles) → 06 (mean mosaic) → 09 (seasonal stacks)
+└── → 05 (outlier mean + count tiles) → 07 (outlier mean mosaic)
+                                      → 08 (outlier count mosaic)
+                                      → 10 (outlier GeoPackages, WGS84 points)
+```
+
 ## Shared Utilities
 
 **`hls_utils.py`** — shared utility module imported by all Python pipeline steps (02–10).
@@ -74,14 +86,60 @@ Add future shared helpers here rather than duplicating across scripts.
 
 **Tile enforcement**: `HLS_TILES` in `config.env` is enforced at every processing step. Steps 02–10 call `filter_by_configured_tiles()` immediately after each glob so only configured tiles are processed. Step 01 (download) uses `HLS_TILES` natively via CMR API queries.
 
-**Parallelism**: Step 02 uses `multiprocessing.Pool`; steps 04, 05, 09, and 10 use `ProcessPoolExecutor`. Worker functions must be defined at module top level for pickling. `NUM_WORKERS` in `config.env` controls pool size.
+**Parallelism**: Step 02 uses `multiprocessing.Pool` with `mp.set_start_method('fork', force=True)`; steps 04, 05, 09, and 10 use `ProcessPoolExecutor`. Worker functions must be defined at module top level (required for pickling). Workers set `dask.config.set(scheduler='synchronous')` internally to prevent nested thread pools.
 
-**Chunked spatial processing**: Steps 04, 05, and 09 use xarray + dask (`CHUNK_SIZE` tiles) to avoid loading full rasters into memory.
+**Chunked spatial processing**: Steps 04, 05, and 09 use xarray + dask (`CHUNK_SIZE` tiles) to avoid loading full rasters into memory. `xr.open_dataset(nc_path, chunks='auto')` for lazy loading; `.compute()` inside worker processes.
 
-**Fmask masking**: Step 02 applies bitwise decode of the Fmask band. Aerosol masking has four modes — `NONE`, `HIGH` (masks high only), `MODERATE` (masks moderate + high), `LOW` (masks all non-zero aerosol levels).
+**Fmask masking**: Step 02 applies bitwise decode of the Fmask band. Bit layout:
+- Bits 0–5: Cirrus, Cloud, Adjacent cloud, Shadow, Snow/ice, Water (one flag each)
+- Bits 6–7: Aerosol level (0=None, 1=Low, 2=Moderate, 3=High) — `MASK_AEROSOL_MODE` selects threshold
+- Value 255: Fill/NoData
 
-**Outlier handling**: "Outliers" are valid (unmasked) pixels that fall outside per-VI min/max bounds. Steps 05/07/08 produce raster summaries (mean + count); step 10 produces a point vector record for every individual outlier pixel-date observation, with coordinates reprojected to WGS84 (EPSG:4326) for GeoPackage compatibility. Uses `geopandas` + `pyproj` + `shapely`.
+**VI formulas** (HLS surface reflectance bands already scaled by `HLS_SCALE_FACTOR = 0.0001`):
+- `NDVI = (nir - red) / (nir + red)`
+- `EVI2 = 2.5 * (nir - red) / (nir + 2.4 * red + 1)`
+- `NIRv = ndvi * nir`
 
-**Temporal storage**: NetCDF files store dates as integer "days since 1970-01-01". Step 09 parses named time windows from `TIMESLICE_WINDOWS` to produce per-window multi-band mosaics.
+All `np.errstate(divide='ignore', invalid='ignore')` is used to suppress divide-by-zero warnings; inf/nan values are carried through and filtered downstream by valid-range logic.
+
+**Worker error handling**: Workers never raise to the main process — they return status strings (e.g., `"OK: ..."`, `"Skipped (Exists): ..."`, `"ERROR: ..."`). The main loop checks the returned string prefix to route success/skip/error. If an output file already exists, the worker returns a skip string and does no computation.
+
+**Outlier handling**: "Outliers" are valid (unmasked) pixels outside per-VI min/max bounds (`np.isfinite(data) & ((data < vmin) | (data > vmax))`). Steps 05/07/08 produce raster summaries (mean + count); step 10 produces a point vector record for every individual outlier pixel-date observation, with coordinates reprojected to WGS84 (EPSG:4326) via `pyproj.Transformer`.
+
+**Temporal storage**: NetCDF files store dates as integer "days since 1970-01-01". Step 09 parses named time windows from `TIMESLICE_WINDOWS` to produce per-window multi-band mosaics with window labels stored in band descriptions.
+
+**Streaming mosaics** (steps 06, 07, 08): Use `rasterio.merge.merge()` for memory-efficient tiling — peak RAM is one tile + output buffer, not all tiles simultaneously.
 
 **Band requirements**: `hls_pipeline.sh` contains a pre-flight validation block that checks that all bands needed for each requested VI are present in the L30 and S30 band lists before executing any step.
+
+## Filename Conventions
+
+| Product | Pattern |
+|---------|---------|
+| Raw HLS band | `HLS.{L30\|S30}.T{TILE}.{YYYYDDD}T{HHMMSS}.v2.0.{BAND}.tif` |
+| VI GeoTIFF | `HLS.{L30\|S30}.T{TILE}.{YYYYDDD}T{HHMMSS}.v2.0.{VI}.tif` |
+| NetCDF time-series | `T{TILE}_{VI}.nc` |
+| Reprojected mean tile | `T{TILE}_{VI}_average_{VI}_{safe_crs}.tif` |
+| Outlier mean tile | `T{TILE}_{VI}_outlier_mean_{VI}_{safe_crs}.tif` |
+| Outlier count tile | `T{TILE}_{VI}_outlier_count_{VI}_{safe_crs}.tif` |
+| Mean mosaic | `HLS_Mosaic_{VI}_{safe_crs}.tif` |
+| Outlier mean mosaic | `HLS_Mosaic_Outlier_Mean_{VI}_{safe_crs}.tif` |
+| Outlier count mosaic | `HLS_Mosaic_Outlier_Count_{VI}_{safe_crs}.tif` |
+| Time-series mean stack | `HLS_TimeSeries_{VI}_Mean_{safe_crs}.tif` |
+| Time-series count stack | `HLS_TimeSeries_{VI}_CountValid_{safe_crs}.tif` |
+| Outlier GeoPackage | `HLS_outliers_{VI}.gpkg` |
+
+`safe_crs` = `TARGET_CRS.replace(':', '')` (e.g., `EPSG6350`).
+
+## Output Data Types
+
+| Product | Dtype | Nodata | LZW Predictor |
+|---------|-------|--------|---------------|
+| VI GeoTIFF | float32 | NaN | — |
+| Mean / outlier mean tile | float32 | NaN | 3 (float differencing) |
+| Outlier count tile | uint16 | 0 | 2 (int differencing) |
+| Time-series mean band | float32 | NaN | 2 |
+| Time-series count band | uint16 | 0 | 2 |
+| NetCDF VI data | float32 | NaN | zlib complevel=1 |
+
+All GeoTIFFs are tiled (512×512 blocks) with LZW compression.

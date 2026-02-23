@@ -19,6 +19,9 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
+# VS Code
+HLS_VI_Pipeline.code-workspace
+
 # Data outputs (large files, not for version control)
 *.nc
 *.tif
