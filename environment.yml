@@ -1,0 +1,24 @@
+# Usage:
+  # conda env create -f environment.yml
+  # conda activate hls_pipeline
+
+# Environment configuration for the HLS Processing Pipeline
+name: hls_pipeline
+
+# Define the repositories to pull packages from
+channels:
+  - conda-forge
+  - defaults
+
+# List of required packages
+dependencies:
+  - python>=3.10,<3.13  # 3.10–3.12: stable, well-tested with all dependencies below
+  - numpy>=1.24,<3.0
+  - pandas>=2.0,<3.0
+  - rasterio>=1.3,<2.0   # Used for reading/writing GeoTIFFs and Fmask masking
+  - netcdf4>=1.6,<2.0    # Core engine for the time-series data cubes
+  - xarray>=2023.1,<2025  # xarray 2024.x removed set_options(scheduler=) — pin above that
+  - rioxarray>=0.15,<1.0  # Connects xarray to rasterio for spatial reprojections
+  - dask>=2023.1,<2026    # Enables memory-efficient chunking for large datasets
+  - geopandas>=0.14,<2.0  # GeoPackage writing and GeoDataFrame construction (step 10)
+  - shapely>=2.0,<3.0     # Point geometry construction for outlier export (step 10)
