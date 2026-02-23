@@ -631,7 +631,7 @@ If `TIMESLICE_ENABLED` is not set to `"TRUE"`, Step 09 will skip processing. Als
 
 **Stephen Conklin**, Geospatial Analyst — Pipeline architecture, orchestration, and all original code · [stephenconklin@gmail.com](mailto:stephenconklin@gmail.com) · [github.com/stephenconklin](https://github.com/stephenconklin)
 
-**G. Burch Fisher, PhD**, Research Scientist — Conceptual guidance and original code for:
+**G. Burch Fisher, PhD**, Research Scientist — Conceptual guidance and original code adapted for:
 - `02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)
 - `03_hls_netcdf_build.py` (NetCDF time-series assembly)
 
@@ -642,7 +642,7 @@ This pipeline was developed with the assistance of [Google Gemini](https://gemin
 ### Adapted Code
 
 **NASA HLS Download Script**
-`01_hls_download.sh` is adapted from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License. `01a_hls_download_query.sh` is original work by Stephen Conklin.
+`01_hls_download.sh` is adapted from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
 
 ### HLS Data Citation
 
