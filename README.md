@@ -63,7 +63,7 @@ The **HLS Vegetation Index Pipeline** automates the full workflow from raw HLS s
 - **Parallel processing** — multiprocessing across configurable worker counts for all compute-intensive steps
 - **Memory-efficient** — dask-chunked xarray processing and streaming rasterio mosaic merges scale to large study extents without out-of-memory failures
 - **Consistent tile filtering** — `HLS_TILES` enforces a fixed MGRS tile set uniformly across all 10 steps
-- **Cloud-optimised output** — all GeoTIFF outputs use LZW compression, internal tiling, and predictor settings appropriate to their data type
+- **Cloud-optimized output** — all GeoTIFF outputs use LZW compression, internal tiling, and predictor settings appropriate to their data type
 - **Pre-flight validation** — the pipeline validates that all bands required for the selected VIs are configured before any step executes
 
 ---
@@ -431,7 +431,7 @@ Aggregates per-granule VI GeoTIFFs into per-tile time-series files.
 Computes the pixel-wise temporal mean for each tile across the full date range and reprojects to `TARGET_CRS`.
 
 - **Inputs:** NetCDF time-series from `NETCDF_DIR`
-- **Outputs:** `T{TILE}_{VI}_average_{VI}_{CRS}.tif` in `REPROJECTED_DIR` (30 m, Cloud-Optimised GeoTIFF)
+- **Outputs:** `T{TILE}_{VI}_average_{VI}_{CRS}.tif` in `REPROJECTED_DIR` (30 m, Cloud-Optimized GeoTIFF)
 - **Note:** Valid-range filtering is applied before computing the mean; outlier pixels do not contribute to the average
 
 ### Step 05 — Outlier Extraction + Reproject
