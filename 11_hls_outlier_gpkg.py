@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# 10_hls_outlier_gpkg.py
-# Pipeline Step 10 (outlier_gpkg): Extract per-pixel outlier observations
+# 11_hls_outlier_gpkg.py
+# Pipeline Step 11 (outlier_gpkg): Extract per-pixel outlier observations
 #   from VI NetCDF time-series and write to a GeoPackage point vector file.
 #
 # Reads each per-tile NetCDF from NETCDF_DIR, identifies pixels whose VI
@@ -149,7 +149,7 @@ def extract_outliers(args: tuple):
 
 
 def main():
-    print(f"--- Step 10: Outlier GeoPackage Export ---")
+    print(f"--- Step 11: Outlier GeoPackage Export ---")
     print(f"VIs: {PROCESSED_VIS}  |  Workers: {N_WORKERS}")
     for vi in PROCESSED_VIS:
         vmin, vmax = get_valid_range(vi)
@@ -222,7 +222,7 @@ def main():
         gdf.to_file(out_path, driver="GPKG")
         print(f"  Wrote: {out_path}  ({len(gdf):,} features)")
 
-    print("\nStep 10 complete.")
+    print("\nStep 11 complete.")
 
 
 if __name__ == "__main__":

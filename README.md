@@ -104,11 +104,11 @@ NASA CMR API
                  ▼                         ├──────────────────────┐
         ┌────────────────┐                 ▼                      ▼
         │  Mean mosaic   │        ┌─────────────────┐   ┌──────────────────┐
-        └────────┬───────┘        │  Outlier rasters│   │  Step 10 · GPKG  │
+        └────────┬───────┘        │  Outlier rasters│   │  Step 11 · GPKG  │
                  │                └─────────────────┘   └──────────────────┘
                  ▼
         ┌────────────────┐
-        │  Step 09       │
+        │  Step 10       │
         │  Time-series   │
         │  stacks        │
         └────────────────┘
@@ -126,9 +126,9 @@ NASA CMR API
 | 06 | `06_hls_mean_mosaic.py` | `mean_mosaic` | Mosaic per-tile means into a study-area-wide GeoTIFF |
 | 07 | `07_hls_outlier_mean_mosaic.py` | `outlier_mosaic` | Mosaic outlier-filtered means |
 | 08 | `08_hls_outlier_count_mosaic.py` | `outlier_counts` | Mosaic valid-observation counts |
-| 09 | `09_hls_timeseries_mosaic.py` | `timeseries` | Multi-band seasonal composite stacks with user-defined time windows |
-| 10 | `10_hls_outlier_gpkg.py` | `outlier_gpkg` | Export per-pixel outlier observations (value, date, location) to GeoPackage |
-| 11 | `11_hls_count_valid_mosaic.py` | `count_valid_mosaic` | Count valid observations per pixel across all download cycles; mosaic into a study-area-wide GeoTIFF |
+| 09 | `09_hls_count_valid_mosaic.py` | `count_valid_mosaic` | Count valid observations per pixel across all download cycles; mosaic into a study-area-wide GeoTIFF |
+| 10 | `10_hls_timeseries_mosaic.py` | `timeseries` | Multi-band seasonal composite stacks with user-defined time windows |
+| 11 | `11_hls_outlier_gpkg.py` | `outlier_gpkg` | Export per-pixel outlier observations (value, date, location) to GeoPackage |
 
 ---
 
@@ -244,7 +244,7 @@ PROCESSED_VIS="NDVI"              # Compute NDVI only
 STEPS="all"                                # Run all 11 steps
 STEPS="products"                           # Steps 02–11 (skip download)
 STEPS="mosaics"                            # Steps 06–08 only
-STEPS="outliers"                           # Steps 05, 07, 08, 10
+STEPS="outliers"                           # Steps 05, 07, 08, 11
 STEPS="vi_calc netcdf mean_flat"           # Named steps, space-separated
 ```
 
@@ -255,7 +255,7 @@ STEPS="vi_calc netcdf mean_flat"           # Named steps, space-separated
 | `all` | Steps 01–11 |
 | `products` | Steps 02–11 |
 | `mosaics` | Steps 06–08 |
-| `outliers` | Steps 05, 07, 08, 10 |
+| `outliers` | Steps 05, 07, 08, 11 |
 
 **Named step identifiers:**
 `download` · `vi_calc` · `netcdf` · `mean_flat` · `outlier_flat` · `mean_mosaic` · `outlier_mosaic` · `outlier_counts` · `count_valid_mosaic` · `timeseries` · `outlier_gpkg`
@@ -313,7 +313,7 @@ HLS_SCALE_FACTOR=0.0001        # HLS surface reflectance scale factor
 
 ### Valid Ranges (Outlier Detection)
 
-Pixels within the valid range contribute to the temporal mean. Pixels outside the valid range are treated as outliers and tracked separately through Steps 05, 07, 08, and 10.
+Pixels within the valid range contribute to the temporal mean. Pixels outside the valid range are treated as outliers and tracked separately through Steps 05, 07, 08, and 11.
 
 ```bash
 VALID_RANGE_NDVI="-1,1"
@@ -323,7 +323,7 @@ VALID_RANGE_NIRv="-0.5,1"
 
 ### Time-Series Windows
 
-Define named time windows for seasonal composite stack generation (Step 09):
+Define named time windows for seasonal composite stack generation (Step 10):
 
 ```bash
 TIMESLICE_ENABLED="TRUE"
@@ -454,7 +454,16 @@ Merge all per-tile rasters into study-area-wide mosaics using streaming merge (m
 | 07 | `HLS_Mosaic_Outlier_Mean_{VI}_{CRS}.tif` | Outlier mean mosaic |
 | 08 | `HLS_Mosaic_Outlier_Count_{VI}_{CRS}.tif` | Outlier count mosaic (uint16, nodata=0) |
 
-### Step 09 — Time-Series Stacks
+### Step 09 — CountValid Mosaic
+
+Counts valid observations per pixel across the full downloaded period and mosaics all tiles into a study-area-wide GeoTIFF. The temporal scope is implicitly defined by `DOWNLOAD_CYCLES` — only data within those cycles is present in the NetCDF files. This step reads directly from NetCDF and is fully independent of Step 10 (`timeseries`).
+
+- **Inputs:** Per-tile NetCDF time-series from `NETCDF_DIR` (produced by Step 03)
+- **Outputs:** `HLS_Mosaic_CountValid_{VI}_{CRS}.tif` in `MOSAIC_DIR`
+- **To run independently:** `STEPS="count_valid_mosaic" bash hls_pipeline.sh`
+- **Band description:** `CountValid_AllDownloadCycles` embedded in band metadata
+
+### Step 10 — Time-Series Stacks
 
 Builds multi-band seasonal composite GeoTIFFs from user-defined time windows.
 
@@ -464,16 +473,7 @@ Builds multi-band seasonal composite GeoTIFFs from user-defined time windows.
   - `HLS_TimeSeries_{VI}_CountValid_{CRS}.tif` — valid-pixel count per window (one band per window)
 - **Band descriptions:** Window labels are embedded in band metadata and are visible in QGIS, GDAL, and rasterio
 
-### Step 11 — CountValid Mosaic
-
-Counts valid observations per pixel across the full downloaded period and mosaics all tiles into a study-area-wide GeoTIFF. The temporal scope is implicitly defined by `DOWNLOAD_CYCLES` — only data within those cycles is present in the NetCDF files. This step reads directly from NetCDF and is fully independent of Step 09 (`timeseries`).
-
-- **Inputs:** Per-tile NetCDF time-series from `NETCDF_DIR` (produced by Step 03)
-- **Outputs:** `HLS_Mosaic_CountValid_{VI}_{CRS}.tif` in `MOSAIC_DIR`
-- **To run independently:** `STEPS="count_valid_mosaic" bash hls_pipeline.sh`
-- **Band description:** `CountValid_AllDownloadCycles` embedded in band metadata
-
-### Step 10 — Outlier GeoPackage
+### Step 11 — Outlier GeoPackage
 
 Exports every individual outlier pixel-date observation as a point feature, enabling spatial and temporal exploration of anomalies.
 
@@ -512,7 +512,7 @@ ${BASE_DIR}/
     │   ├── HLS_Mosaic_{VI}_{CRS}.tif
     │   ├── HLS_Mosaic_Outlier_Mean_{VI}_{CRS}.tif
     │   ├── HLS_Mosaic_Outlier_Count_{VI}_{CRS}.tif
-    │   └── HLS_Mosaic_CountValid_{VI}_{CRS}.tif           (step 11 — count across all download cycles)
+    │   └── HLS_Mosaic_CountValid_{VI}_{CRS}.tif           (step 09 — count across all download cycles)
     ├── 2_TimeSeries/
     │   ├── HLS_TimeSeries_{VI}_Mean_{CRS}.tif             (N bands — one per window)
     │   └── HLS_TimeSeries_{VI}_CountValid_{CRS}.tif       (N bands — one per window)
@@ -531,11 +531,11 @@ ${BASE_DIR}/
 | Outlier count tile (step 05) | GeoTIFF | uint16 | 0 | LZW + predictor 2 |
 | Mean / outlier mosaics (steps 06–07) | GeoTIFF | float32 | NaN | LZW |
 | Count mosaic (step 08) | GeoTIFF | uint16 | 0 | LZW |
-| Time-series stacks (step 09) | BigTIFF | float32 / uint16 | NaN / 0 | LZW |
-| CountValid mosaic (step 11) | GeoTIFF | uint16 | 0 | LZW + predictor 2 |
-| Outlier GeoPackage (step 10) | GeoPackage | — | — | — |
+| CountValid mosaic (step 09) | GeoTIFF | uint16 | 0 | LZW + predictor 2 |
+| Time-series stacks (step 10) | BigTIFF | float32 / uint16 | NaN / 0 | LZW |
+| Outlier GeoPackage (step 11) | GeoPackage | — | — | — |
 
-> **Nodata note:** A value of `0` in count products means no data at that pixel, not missing data in the raster sense. For outlier count products (steps 05/08), `0` means no outlier observations were recorded. For the CountValid mosaic (step 11), `0` means no valid observations were found across all download cycles.
+> **Nodata note:** A value of `0` in count products means no data at that pixel, not missing data in the raster sense. For outlier count products (steps 05/08), `0` means no outlier observations were recorded. For the CountValid mosaic (step 09), `0` means no valid observations were found across all download cycles.
 
 ---
 
@@ -580,7 +580,7 @@ VALID_RANGE_NDVI="0.1,0.9"   # Forest canopy: exclude bare soil and sparse cover
 VALID_RANGE_EVI2="-0.5,1.5"  # Wider range for agricultural areas
 ```
 
-Any unmasked pixel outside these bounds is flagged as an outlier and routed to Steps 05, 07, 08, and 10.
+Any unmasked pixel outside these bounds is flagged as an outlier and routed to Steps 05, 07, 08, and 11.
 
 ### Optimising Worker Count
 
@@ -615,7 +615,7 @@ Verify your `~/.netrc` credentials, file permissions (`chmod 600 ~/.netrc`), and
 
 Verify that `config.env` is present in the repository root and that all required variables are set. The pipeline has been tested on macOS (ZSH) and Linux.
 
-### Out-of-memory errors during Steps 04, 05, or 09
+### Out-of-memory errors during Steps 04, 05, 09, or 10
 
 Reduce `NUM_WORKERS` and/or `CHUNK_SIZE` in `config.env`. Fewer simultaneous dask tasks significantly reduce peak RAM usage.
 
@@ -631,9 +631,9 @@ Verify that the missing tiles are included in `HLS_TILES` and that their interme
 
 HLS granule filenames must not be renamed. Step 03 parses acquisition dates directly from the standard HLS filename convention: `HLS.{L30|S30}.T{TILE}.{YYYYDDD}T{HHMMSS}.v2.0`.
 
-### Step 09 time-series stack has fewer bands than expected
+### Step 10 time-series stack has fewer bands than expected
 
-If `TIMESLICE_ENABLED` is not set to `"TRUE"`, Step 09 will skip processing. Also verify that at least one observation falls within each configured time window for the tiles in `HLS_TILES`.
+If `TIMESLICE_ENABLED` is not set to `"TRUE"`, Step 10 will skip processing. Also verify that at least one observation falls within each configured time window for the tiles in `HLS_TILES`.
 
 ---
 

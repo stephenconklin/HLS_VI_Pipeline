@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# 09_hls_timeseries_mosaic.py
-# Pipeline Step 09 (timeseries): Build custom time-window VI mosaic stacks.
+# 10_hls_timeseries_mosaic.py
+# Pipeline Step 10 (timeseries): Build custom time-window VI mosaic stacks.
 #   Produces multi-band GeoTIFFs: one band per TIMESLICE_WINDOWS entry.
 #
 # For each VI in PROCESSED_VIS and each window defined in TIMESLICE_WINDOWS,
@@ -428,7 +428,7 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
 
 def main():
     print("=" * 65)
-    print(" Step 09: Custom Time-Window VI Mosaic Stacks")
+    print(" Step 10: Custom Time-Window VI Mosaic Stacks")
     print("=" * 65)
 
     try:
@@ -446,7 +446,7 @@ def main():
     build_timeseries_stacks(windows, PROCESSED_VIS)
 
     print("=" * 65)
-    print(" Step 09 complete.")
+    print(" Step 10 complete.")
     print(f" Output directory: {OUTPUT_DIR}")
     print("=" * 65)
 

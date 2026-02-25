@@ -18,15 +18,15 @@
 #     mean_mosaic     06 — Mosaic mean tiles
 #     outlier_mosaic  07 — Mosaic outlier mean tiles
 #     outlier_counts  08 — Mosaic outlier count tiles
-#     timeseries      09 — Custom time-window multi-band stacks
-#     count_valid_mosaic 11 — CountValid mosaic across all download cycles
-#     outlier_gpkg    10 — Export per-pixel outlier observations to GeoPackage
+#     count_valid_mosaic 09 — CountValid mosaic across all download cycles
+#     timeseries      10 — Custom time-window multi-band stacks
+#     outlier_gpkg    11 — Export per-pixel outlier observations to GeoPackage
 #
 #   Aliases:
 #     all             Steps 01–11 (full pipeline)
 #     products        Steps 02–11 (skip download)
 #     mosaics         Steps 06–08 (re-mosaic only)
-#     outliers        Steps 05+07+08+10 (full outlier chain)
+#     outliers        Steps 05+07+08+11 (full outlier chain)
 #
 # Script-to-step mapping:
 #   download       → 01_hls_download.sh  (calls 01a_hls_download_query.sh)
@@ -37,9 +37,9 @@
 #   mean_mosaic    → 06_hls_mean_mosaic.py
 #   outlier_mosaic → 07_hls_outlier_mean_mosaic.py
 #   outlier_counts → 08_hls_outlier_count_mosaic.py
-#   timeseries       → 09_hls_timeseries_mosaic.py
-#   count_valid_mosaic → 11_hls_count_valid_mosaic.py
-#   outlier_gpkg     → 10_hls_outlier_gpkg.py
+#   count_valid_mosaic → 09_hls_count_valid_mosaic.py
+#   timeseries       → 10_hls_timeseries_mosaic.py
+#   outlier_gpkg     → 11_hls_outlier_gpkg.py
 #
 # Author:  Stephen Conklin <stephenconklin@gmail.com>
 #          https://github.com/stephenconklin
@@ -210,9 +210,9 @@ for step in $ALL_STEPS; do
         mean_mosaic)    num="06"; label="Mean mosaic" ;;
         outlier_mosaic) num="07"; label="Outlier mean mosaic" ;;
         outlier_counts) num="08"; label="Outlier count mosaic" ;;
-        timeseries)       num="09"; label="Time-series stacks" ;;
-        count_valid_mosaic) num="11"; label="CountValid mosaic (all download cycles)" ;;
-        outlier_gpkg)     num="10"; label="Outlier GeoPackage export" ;;
+        count_valid_mosaic) num="09"; label="CountValid mosaic (all download cycles)" ;;
+        timeseries)       num="10"; label="Time-series stacks" ;;
+        outlier_gpkg)     num="11"; label="Outlier GeoPackage export" ;;
     esac
     if step_active "$step"; then
         echo "   [✓] Step $num  $label  ($step)"
@@ -306,39 +306,39 @@ if step_active "outlier_counts"; then
 fi
 
 # -----------------------------------------------------------------
-# STEP 11: COUNTVALID MOSAIC (ALL DOWNLOAD CYCLES)
+# STEP 09: COUNTVALID MOSAIC (ALL DOWNLOAD CYCLES)
 # -----------------------------------------------------------------
 if step_active "count_valid_mosaic"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 11 | count_valid_mosaic] Building CountValid mosaic for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 11_hls_count_valid_mosaic.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 11] Complete." | tee -a "$LOGFILE"
+    echo "[Step 09 | count_valid_mosaic] Building CountValid mosaic for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" 09_hls_count_valid_mosaic.py 2>&1 | tee -a "$LOGFILE"
+    echo "[Step 09] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
-# STEP 09: TIME-SERIES STACKS
+# STEP 10: TIME-SERIES STACKS
 # -----------------------------------------------------------------
 if step_active "timeseries"; then
     if [ "${TIMESLICE_ENABLED:-FALSE}" = "TRUE" ]; then
         echo "" | tee -a "$LOGFILE"
-        echo "[Step 09 | timeseries] Building time-series stacks for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-        echo "[Step 09] Windows: ${TIMESLICE_WINDOWS}" | tee -a "$LOGFILE"
-        "$PYTHON_EXEC" 09_hls_timeseries_mosaic.py 2>&1 | tee -a "$LOGFILE"
-        echo "[Step 09] Complete." | tee -a "$LOGFILE"
+        echo "[Step 10 | timeseries] Building time-series stacks for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+        echo "[Step 10] Windows: ${TIMESLICE_WINDOWS}" | tee -a "$LOGFILE"
+        "$PYTHON_EXEC" 10_hls_timeseries_mosaic.py 2>&1 | tee -a "$LOGFILE"
+        echo "[Step 10] Complete." | tee -a "$LOGFILE"
     else
         echo "" | tee -a "$LOGFILE"
-        echo "[Step 09 | timeseries] Skipped — TIMESLICE_ENABLED is not TRUE." | tee -a "$LOGFILE"
+        echo "[Step 10 | timeseries] Skipped — TIMESLICE_ENABLED is not TRUE." | tee -a "$LOGFILE"
     fi
 fi
 
 # -----------------------------------------------------------------
-# STEP 10: OUTLIER GEOPACKAGE EXPORT
+# STEP 11: OUTLIER GEOPACKAGE EXPORT
 # -----------------------------------------------------------------
 if step_active "outlier_gpkg"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 10 | outlier_gpkg] Exporting outlier points to GeoPackage for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 10_hls_outlier_gpkg.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 10] Complete." | tee -a "$LOGFILE"
+    echo "[Step 11 | outlier_gpkg] Exporting outlier points to GeoPackage for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" 11_hls_outlier_gpkg.py 2>&1 | tee -a "$LOGFILE"
+    echo "[Step 11] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------

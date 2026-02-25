@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# 11_hls_count_valid_mosaic.py
-# Pipeline Step 11 (count_valid_mosaic): Count valid observations per pixel
+# 09_hls_count_valid_mosaic.py
+# Pipeline Step 09 (count_valid_mosaic): Count valid observations per pixel
 #   across the full downloaded period and mosaic into a study-area-wide GeoTIFF.
 #
 # For each VI in PROCESSED_VIS:
@@ -248,7 +248,7 @@ def build_count_valid_mosaic(processed_vis: list):
 
 def main():
     print("=" * 65)
-    print(" Step 11: CountValid Mosaic (All Download Cycles)")
+    print(" Step 09: CountValid Mosaic (All Download Cycles)")
     print("=" * 65)
     print(f"NetCDF dir: {NETCDF_DIR}")
     print(f"Mosaic dir: {MOSAIC_DIR}")
@@ -258,7 +258,7 @@ def main():
     build_count_valid_mosaic(PROCESSED_VIS)
 
     print("=" * 65)
-    print(" Step 11 complete.")
+    print(" Step 09 complete.")
     print(f" Output directory: {MOSAIC_DIR}")
     print("=" * 65)
 
