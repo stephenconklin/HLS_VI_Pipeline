@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS-lightgrey.svg)]()
 [![Data: HLS v2.0](https://img.shields.io/badge/data-HLS%20v2.0-brightgreen.svg)](https://hls.gsfc.nasa.gov/)
 
-A production-ready, 10-step processing pipeline for computing and analyzing vegetation indices from NASA's Harmonized Landsat and Sentinel-2 (HLS) surface reflectance data. Designed for researchers across ecology, agriculture, land management, and remote sensing who need reproducible, time-series vegetation analysis at scale.
+A production-ready, 11-step processing pipeline for computing and analyzing vegetation indices from NASA's Harmonized Landsat and Sentinel-2 (HLS) surface reflectance data. Designed for researchers across ecology, agriculture, land management, and remote sensing who need reproducible, time-series vegetation analysis at scale.
 
 ---
 
@@ -55,14 +55,14 @@ The **HLS Vegetation Index Pipeline** automates the full workflow from raw HLS s
 
 ## Key Features
 
-- **End-to-end automation** — a single `bash hls_pipeline.sh` command runs all 10 steps sequentially
+- **End-to-end automation** — a single `bash hls_pipeline.sh` command runs all 11 steps sequentially
 - **Flexible step control** — run the full pipeline or any subset using named step identifiers or built-in aliases
 - **Quality masking** — bitwise Fmask decode with independently configurable cloud, cloud shadow, snow/ice, water, and aerosol modes
 - **Outlier detection** — identifies and exports pixels outside per-VI valid ranges as raster summaries and searchable point-vector GeoPackages
 - **Seasonal composites** — user-defined, named time windows produce multi-band stacks for phenological or climatological analysis, with window labels embedded in band metadata
 - **Parallel processing** — multiprocessing across configurable worker counts for all compute-intensive steps
 - **Memory-efficient** — dask-chunked xarray processing and streaming rasterio mosaic merges scale to large study extents without out-of-memory failures
-- **Consistent tile filtering** — `HLS_TILES` enforces a fixed MGRS tile set uniformly across all 10 steps
+- **Consistent tile filtering** — `HLS_TILES` enforces a fixed MGRS tile set uniformly across all 11 steps
 - **Cloud-optimized output** — all GeoTIFF outputs use LZW compression, internal tiling, and predictor settings appropriate to their data type
 - **Pre-flight validation** — the pipeline validates that all bands required for the selected VIs are configured before any step executes
 
@@ -128,6 +128,7 @@ NASA CMR API
 | 08 | `08_hls_outlier_count_mosaic.py` | `outlier_counts` | Mosaic valid-observation counts |
 | 09 | `09_hls_timeseries_mosaic.py` | `timeseries` | Multi-band seasonal composite stacks with user-defined time windows |
 | 10 | `10_hls_outlier_gpkg.py` | `outlier_gpkg` | Export per-pixel outlier observations (value, date, location) to GeoPackage |
+| 11 | `11_hls_count_valid_mosaic.py` | `count_valid_mosaic` | Count valid observations per pixel across all download cycles; mosaic into a study-area-wide GeoTIFF |
 
 ---
 
@@ -240,8 +241,8 @@ PROCESSED_VIS="NDVI"              # Compute NDVI only
 ### Step Control
 
 ```bash
-STEPS="all"                                # Run all 10 steps
-STEPS="products"                           # Steps 02–10 (skip download)
+STEPS="all"                                # Run all 11 steps
+STEPS="products"                           # Steps 02–11 (skip download)
 STEPS="mosaics"                            # Steps 06–08 only
 STEPS="outliers"                           # Steps 05, 07, 08, 10
 STEPS="vi_calc netcdf mean_flat"           # Named steps, space-separated
@@ -251,13 +252,13 @@ STEPS="vi_calc netcdf mean_flat"           # Named steps, space-separated
 
 | Alias | Expands To |
 |-------|-----------|
-| `all` | Steps 01–10 |
-| `products` | Steps 02–10 |
+| `all` | Steps 01–11 |
+| `products` | Steps 02–11 |
 | `mosaics` | Steps 06–08 |
 | `outliers` | Steps 05, 07, 08, 10 |
 
 **Named step identifiers:**
-`download` · `vi_calc` · `netcdf` · `mean_flat` · `outlier_flat` · `mean_mosaic` · `outlier_mosaic` · `outlier_counts` · `timeseries` · `outlier_gpkg`
+`download` · `vi_calc` · `netcdf` · `mean_flat` · `outlier_flat` · `mean_mosaic` · `outlier_mosaic` · `outlier_counts` · `count_valid_mosaic` · `timeseries` · `outlier_gpkg`
 
 ### Tile List
 
@@ -463,6 +464,15 @@ Builds multi-band seasonal composite GeoTIFFs from user-defined time windows.
   - `HLS_TimeSeries_{VI}_CountValid_{CRS}.tif` — valid-pixel count per window (one band per window)
 - **Band descriptions:** Window labels are embedded in band metadata and are visible in QGIS, GDAL, and rasterio
 
+### Step 11 — CountValid Mosaic
+
+Counts valid observations per pixel across the full downloaded period and mosaics all tiles into a study-area-wide GeoTIFF. The temporal scope is implicitly defined by `DOWNLOAD_CYCLES` — only data within those cycles is present in the NetCDF files. This step reads directly from NetCDF and is fully independent of Step 09 (`timeseries`).
+
+- **Inputs:** Per-tile NetCDF time-series from `NETCDF_DIR` (produced by Step 03)
+- **Outputs:** `HLS_Mosaic_CountValid_{VI}_{CRS}.tif` in `MOSAIC_DIR`
+- **To run independently:** `STEPS="count_valid_mosaic" bash hls_pipeline.sh`
+- **Band description:** `CountValid_AllDownloadCycles` embedded in band metadata
+
 ### Step 10 — Outlier GeoPackage
 
 Exports every individual outlier pixel-date observation as a point feature, enabling spatial and temporal exploration of anomalies.
@@ -501,10 +511,11 @@ ${BASE_DIR}/
     ├── 1_Mosaic/
     │   ├── HLS_Mosaic_{VI}_{CRS}.tif
     │   ├── HLS_Mosaic_Outlier_Mean_{VI}_{CRS}.tif
-    │   └── HLS_Mosaic_Outlier_Count_{VI}_{CRS}.tif
+    │   ├── HLS_Mosaic_Outlier_Count_{VI}_{CRS}.tif
+    │   └── HLS_Mosaic_CountValid_{VI}_{CRS}.tif           (step 11 — count across all download cycles)
     ├── 2_TimeSeries/
-    │   ├── HLS_TimeSeries_{VI}_Mean_{CRS}.tif       (N bands — one per window)
-    │   └── HLS_TimeSeries_{VI}_CountValid_{CRS}.tif (N bands — one per window)
+    │   ├── HLS_TimeSeries_{VI}_Mean_{CRS}.tif             (N bands — one per window)
+    │   └── HLS_TimeSeries_{VI}_CountValid_{CRS}.tif       (N bands — one per window)
     └── 3_Outlier_Points/
         └── HLS_outliers_{VI}.gpkg
 ```
@@ -521,9 +532,10 @@ ${BASE_DIR}/
 | Mean / outlier mosaics (steps 06–07) | GeoTIFF | float32 | NaN | LZW |
 | Count mosaic (step 08) | GeoTIFF | uint16 | 0 | LZW |
 | Time-series stacks (step 09) | BigTIFF | float32 / uint16 | NaN / 0 | LZW |
+| CountValid mosaic (step 11) | GeoTIFF | uint16 | 0 | LZW + predictor 2 |
 | Outlier GeoPackage (step 10) | GeoPackage | — | — | — |
 
-> **Nodata note:** A value of `0` in count products means "no outliers observed at this pixel," not missing data.
+> **Nodata note:** A value of `0` in count products means no data at that pixel, not missing data in the raster sense. For outlier count products (steps 05/08), `0` means no outlier observations were recorded. For the CountValid mosaic (step 11), `0` means no valid observations were found across all download cycles.
 
 ---
 
@@ -589,7 +601,7 @@ TARGET_CRS="EPSG:32618"   # UTM Zone 18N (WGS84)
 TARGET_CRS="EPSG:3857"    # Web Mercator
 ```
 
-All reprojected outputs and mosaics (Steps 04–09) will use the new CRS. The CRS code (dots stripped) is embedded in output filenames (e.g., `EPSG6350`).
+All reprojected outputs and mosaics (Steps 04–11) will use the new CRS. The CRS code (dots stripped) is embedded in output filenames (e.g., `EPSG6350`).
 
 ---
 
@@ -629,7 +641,7 @@ If `TIMESLICE_ENABLED` is not set to `"TRUE"`, Step 09 will skip processing. Als
 
 ### Authors
 
-**Stephen Conklin**, Geospatial Analyst — Pipeline architecture, orchestration, and all original code · [stephenconklin@gmail.com](mailto:stephenconklin@gmail.com) · [github.com/stephenconklin](https://github.com/stephenconklin)
+**Stephen Conklin**, Geospatial Analyst — Pipeline architecture, orchestration, and all original code · [github.com/stephenconklin](https://github.com/stephenconklin)
 
 **G. Burch Fisher, PhD**, Research Scientist — Conceptual guidance and original code adapted for:
 - `02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)

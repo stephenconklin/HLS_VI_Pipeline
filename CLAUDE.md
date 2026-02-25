@@ -17,8 +17,8 @@ bash hls_pipeline.sh
 ```
 
 The `STEPS` variable in `config.env` controls which steps run. Valid values:
-- Named steps: `download`, `vi_calc`, `netcdf`, `mean_flat`, `outlier_flat`, `mean_mosaic`, `outlier_mosaic`, `outlier_counts`, `timeseries`, `outlier_gpkg`
-- Aliases: `all` (steps 01–10), `products` (02–10), `mosaics` (06–08), `outliers` (05+07+08+10)
+- Named steps: `download`, `vi_calc`, `netcdf`, `mean_flat`, `outlier_flat`, `mean_mosaic`, `outlier_mosaic`, `outlier_counts`, `count_valid_mosaic`, `timeseries`, `outlier_gpkg`
+- Aliases: `all` (steps 01–11), `products` (02–11), `mosaics` (06–08), `outliers` (05+07+08+10)
 
 ## Configuration
 
@@ -28,7 +28,7 @@ All pipeline parameters live in `config.env`. Key sections:
 - **VI selection**: `PROCESSED_VIS` — space-separated list of `NDVI`, `EVI2`, `NIRv`
 - **Fmask masking**: Individual boolean flags for cirrus, cloud, adjacent cloud, shadow, snow/ice, water, and aerosol mode (`NONE`/`HIGH`/`MODERATE`/`LOW`)
 - **Valid ranges**: Per-VI outlier bounds via `VALID_RANGE_NDVI`, `VALID_RANGE_EVI2`, `VALID_RANGE_NIRv` (format: `"min,max"`; defaults: NDVI `"-1,1"`, EVI2 `"-1,2"`, NIRv `"-0.5,1"`)
-- **Tile list** (`HLS_TILES`): Space-separated MGRS tile IDs enforced across all steps (02–10); if unset, no filter is applied
+- **Tile list** (`HLS_TILES`): Space-separated MGRS tile IDs enforced across all steps (02–11); if unset, no filter is applied
 - **Download cycles**: Date ranges in `YYYY-MM-DD|YYYY-MM-DD` format
 - **Time-series windows**: `TIMESLICE_WINDOWS` — space-separated `label:YYYY-MM-DD|YYYY-MM-DD` tokens (labels: alphanumeric + underscores, start ≤ end)
 
@@ -36,7 +36,7 @@ Python scripts read all configuration via `os.environ.get()` with fallback defau
 
 ## Pipeline Architecture
 
-The pipeline is a 10-step sequential workflow for processing HLS (Harmonized Landsat-Sentinel 2) satellite imagery into vegetation index (VI) products:
+The pipeline is an 11-step sequential workflow for processing HLS (Harmonized Landsat-Sentinel 2) satellite imagery into vegetation index (VI) products:
 
 | Step | Script | Purpose |
 |------|--------|---------|
@@ -50,6 +50,7 @@ The pipeline is a 10-step sequential workflow for processing HLS (Harmonized Lan
 | 08 | `08_hls_outlier_count_mosaic.py` | Mosaic valid-observation counts |
 | 09 | `09_hls_timeseries_mosaic.py` | Multi-band time-window stacks (seasonal composites) |
 | 10 | `10_hls_outlier_gpkg.py` | Export per-pixel outlier observations (value, date, location) to a GeoPackage point vector file |
+| 11 | `11_hls_count_valid_mosaic.py` | Count valid observations per pixel across all download cycles; mosaic into a single-band study-area-wide GeoTIFF |
 
 `hls_pipeline.sh` is the master orchestrator: it sources `config.env`, validates that required bands are configured for each requested VI before any step runs, then dispatches the appropriate scripts.
 
@@ -59,36 +60,38 @@ The pipeline is a 10-step sequential workflow for processing HLS (Harmonized Lan
 NASA CMR API → 01 (raw L30/S30 + Fmask)
 → 02 (VI GeoTIFFs per granule, Fmask-masked)
 → 03 (per-tile CF-1.8 NetCDF time-series)
-├── → 04 (mean tiles) → 06 (mean mosaic) → 09 (seasonal stacks)
-└── → 05 (outlier mean + count tiles) → 07 (outlier mean mosaic)
-                                      → 08 (outlier count mosaic)
-                                      → 10 (outlier GeoPackages, WGS84 points)
+├── → 04 (mean tiles) → 06 (mean mosaic)
+├── → 05 (outlier mean + count tiles) → 07 (outlier mean mosaic)
+│                                     → 08 (outlier count mosaic)
+│                                     → 10 (outlier GeoPackages, WGS84 points)
+├── → 11 (CountValid mosaic across all download cycles)
+└── → 09 (per-window mean + CountValid stacks, TIMESLICE_WINDOWS)
 ```
 
 ## Shared Utilities
 
-**`hls_utils.py`** — shared utility module imported by all Python pipeline steps (02–10).
+**`hls_utils.py`** — shared utility module imported by all Python pipeline steps (02–11).
 
 **Tile filtering** (used by all steps):
 - `get_configured_tiles()` — returns `set` of tile IDs from `HLS_TILES` env var, or empty set (no filter)
 - `tile_id_from_path(filepath)` — extracts bare MGRS tile ID from any HLS filename (handles both dot-separated raw/VI GeoTIFF names and underscore-separated NetCDF/reprojected names)
 - `filter_by_configured_tiles(filepaths)` — filters a file list to only those matching `HLS_TILES`; pass-through if `HLS_TILES` is unset
 
-**VI valid ranges** (used by steps 04, 05, 09, 10):
+**VI valid ranges** (used by steps 04, 05, 09, 10, 11):
 - `get_valid_range(vi_type)` — returns `(vmin, vmax)` from `VALID_RANGE_{VI}` env var; falls back to per-VI defaults and prints a warning if the variable is missing or unparseable
 
-**CRS detection** (used by steps 04, 05, 09):
+**CRS detection** (used by steps 04, 05, 09, 11):
 - `detect_crs(ds, da)` — tries `da.rio.crs`, then `ds.attrs['crs']`, then per-variable `crs_wkt`/`spatial_ref` attributes; returns first match or `None`
 
 Add future shared helpers here rather than duplicating across scripts.
 
 ## Key Patterns
 
-**Tile enforcement**: `HLS_TILES` in `config.env` is enforced at every processing step. Steps 02–10 call `filter_by_configured_tiles()` immediately after each glob so only configured tiles are processed. Step 01 (download) uses `HLS_TILES` natively via CMR API queries.
+**Tile enforcement**: `HLS_TILES` in `config.env` is enforced at every processing step. Steps 02–11 call `filter_by_configured_tiles()` immediately after each glob so only configured tiles are processed. Step 01 (download) uses `HLS_TILES` natively via CMR API queries.
 
-**Parallelism**: Step 02 uses `multiprocessing.Pool` with `mp.set_start_method('fork', force=True)`; steps 04, 05, 09, and 10 use `ProcessPoolExecutor`. Worker functions must be defined at module top level (required for pickling). Workers set `dask.config.set(scheduler='synchronous')` internally to prevent nested thread pools.
+**Parallelism**: Step 02 uses `multiprocessing.Pool` with `mp.set_start_method('fork', force=True)`; steps 04, 05, 09, 10, and 11 use `ProcessPoolExecutor`. Worker functions must be defined at module top level (required for pickling). Workers set `dask.config.set(scheduler='synchronous')` internally to prevent nested thread pools.
 
-**Chunked spatial processing**: Steps 04, 05, and 09 use xarray + dask (`CHUNK_SIZE` tiles) to avoid loading full rasters into memory. `xr.open_dataset(nc_path, chunks='auto')` for lazy loading; `.compute()` inside worker processes.
+**Chunked spatial processing**: Steps 04, 05, 09, and 11 use xarray + dask (`CHUNK_SIZE` tiles) to avoid loading full rasters into memory. `xr.open_dataset(nc_path, chunks='auto')` for lazy loading; `.compute()` inside worker processes.
 
 **Fmask masking**: Step 02 applies bitwise decode of the Fmask band. Bit layout:
 - Bits 0–5: Cirrus, Cloud, Adjacent cloud, Shadow, Snow/ice, Water (one flag each)
@@ -102,13 +105,13 @@ Add future shared helpers here rather than duplicating across scripts.
 
 All `np.errstate(divide='ignore', invalid='ignore')` is used to suppress divide-by-zero warnings; inf/nan values are carried through and filtered downstream by valid-range logic.
 
-**Worker error handling**: Workers never raise to the main process — they return status strings (e.g., `"OK: ..."`, `"Skipped (Exists): ..."`, `"ERROR: ..."`). The main loop checks the returned string prefix to route success/skip/error. If an output file already exists, the worker returns a skip string and does no computation.
+**Worker error handling**: Workers never raise to the main process. Steps 02, 04, 05, and 10 return status strings (e.g., `"OK: ..."`, `"Skipped (Exists): ..."`, `"ERROR: ..."`); the main loop checks the returned string prefix. Steps 09 and 11 return dicts (`{'status': 'ok'|'skip'|'error', 'message': ..., ...}`); the main loop checks `result['status']`. In both patterns, if an output file already exists the worker returns a skip result and does no computation.
 
 **Outlier handling**: "Outliers" are valid (unmasked) pixels outside per-VI min/max bounds (`np.isfinite(data) & ((data < vmin) | (data > vmax))`). Steps 05/07/08 produce raster summaries (mean + count); step 10 produces a point vector record for every individual outlier pixel-date observation, with coordinates reprojected to WGS84 (EPSG:4326) via `pyproj.Transformer`.
 
 **Temporal storage**: NetCDF files store dates as integer "days since 1970-01-01". Step 09 parses named time windows from `TIMESLICE_WINDOWS` to produce per-window multi-band mosaics with window labels stored in band descriptions.
 
-**Streaming mosaics** (steps 06, 07, 08): Use `rasterio.merge.merge()` for memory-efficient tiling — peak RAM is one tile + output buffer, not all tiles simultaneously.
+**Streaming mosaics** (steps 06, 07, 08, 11): Use `rasterio.merge.merge()` for memory-efficient tiling — peak RAM is one tile + output buffer, not all tiles simultaneously.
 
 **Band requirements**: `hls_pipeline.sh` contains a pre-flight validation block that checks that all bands needed for each requested VI are present in the L30 and S30 band lists before executing any step.
 
@@ -127,6 +130,7 @@ All `np.errstate(divide='ignore', invalid='ignore')` is used to suppress divide-
 | Outlier count mosaic | `HLS_Mosaic_Outlier_Count_{VI}_{safe_crs}.tif` |
 | Time-series mean stack | `HLS_TimeSeries_{VI}_Mean_{safe_crs}.tif` |
 | Time-series count stack | `HLS_TimeSeries_{VI}_CountValid_{safe_crs}.tif` |
+| CountValid mosaic | `HLS_Mosaic_CountValid_{VI}_{safe_crs}.tif` |
 | Outlier GeoPackage | `HLS_outliers_{VI}.gpkg` |
 
 `safe_crs` = `TARGET_CRS.replace(':', '')` (e.g., `EPSG6350`).
@@ -140,6 +144,7 @@ All `np.errstate(divide='ignore', invalid='ignore')` is used to suppress divide-
 | Outlier count tile | uint16 | 0 | 2 (int differencing) |
 | Time-series mean band | float32 | NaN | 2 |
 | Time-series count band | uint16 | 0 | 2 |
+| CountValid mosaic | uint16 | 0 | 2 (int differencing) |
 | NetCDF VI data | float32 | NaN | zlib complevel=1 |
 
 All GeoTIFFs are tiled (512×512 blocks) with LZW compression.

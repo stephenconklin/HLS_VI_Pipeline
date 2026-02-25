@@ -27,3 +27,6 @@ HLS_VI_Pipeline.code-workspace
 *.tif
 *.tiff
 *.gpkg
+
+# Runtime artifacts
+tiles_active_run.txt

@@ -3,7 +3,7 @@
 #
 # hls_utils.py
 # Shared utilities for the HLS_VI_Pipeline.
-# All pipeline steps (02–10) import from here.
+# All pipeline steps (02–11) import from here.
 #
 # Author:  Stephen Conklin <stephenconklin@gmail.com>
 #          https://github.com/stephenconklin

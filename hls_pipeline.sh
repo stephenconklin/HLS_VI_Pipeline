@@ -19,11 +19,12 @@
 #     outlier_mosaic  07 — Mosaic outlier mean tiles
 #     outlier_counts  08 — Mosaic outlier count tiles
 #     timeseries      09 — Custom time-window multi-band stacks
+#     count_valid_mosaic 11 — CountValid mosaic across all download cycles
 #     outlier_gpkg    10 — Export per-pixel outlier observations to GeoPackage
 #
 #   Aliases:
-#     all             Steps 01–10 (full pipeline)
-#     products        Steps 02–10 (skip download)
+#     all             Steps 01–11 (full pipeline)
+#     products        Steps 02–11 (skip download)
 #     mosaics         Steps 06–08 (re-mosaic only)
 #     outliers        Steps 05+07+08+10 (full outlier chain)
 #
@@ -36,8 +37,9 @@
 #   mean_mosaic    → 06_hls_mean_mosaic.py
 #   outlier_mosaic → 07_hls_outlier_mean_mosaic.py
 #   outlier_counts → 08_hls_outlier_count_mosaic.py
-#   timeseries     → 09_hls_timeseries_mosaic.py
-#   outlier_gpkg   → 10_hls_outlier_gpkg.py
+#   timeseries       → 09_hls_timeseries_mosaic.py
+#   count_valid_mosaic → 11_hls_count_valid_mosaic.py
+#   outlier_gpkg     → 10_hls_outlier_gpkg.py
 #
 # Author:  Stephen Conklin <stephenconklin@gmail.com>
 #          https://github.com/stephenconklin
@@ -124,8 +126,8 @@ echo ""
 # Expand any aliases in STEPS to their constituent step names,
 # then deduplicate while preserving logical pipeline order.
 
-ALL_STEPS="download vi_calc netcdf mean_flat outlier_flat mean_mosaic outlier_mosaic outlier_counts timeseries outlier_gpkg"
-PRODUCTS_STEPS="vi_calc netcdf mean_flat outlier_flat mean_mosaic outlier_mosaic outlier_counts timeseries outlier_gpkg"
+ALL_STEPS="download vi_calc netcdf mean_flat outlier_flat mean_mosaic outlier_mosaic outlier_counts count_valid_mosaic timeseries outlier_gpkg"
+PRODUCTS_STEPS="vi_calc netcdf mean_flat outlier_flat mean_mosaic outlier_mosaic outlier_counts count_valid_mosaic timeseries outlier_gpkg"
 MOSAICS_STEPS="mean_mosaic outlier_mosaic outlier_counts"
 OUTLIERS_STEPS="outlier_flat outlier_mosaic outlier_counts outlier_gpkg"
 
@@ -138,12 +140,12 @@ for token in ${STEPS:-all}; do
         mosaics)  EXPANDED="$EXPANDED $MOSAICS_STEPS" ;;
         outliers) EXPANDED="$EXPANDED $OUTLIERS_STEPS" ;;
         download|vi_calc|netcdf|mean_flat|outlier_flat| \
-        mean_mosaic|outlier_mosaic|outlier_counts|timeseries|outlier_gpkg)
+        mean_mosaic|outlier_mosaic|outlier_counts|count_valid_mosaic|timeseries|outlier_gpkg)
                   EXPANDED="$EXPANDED $token" ;;
         *)
             echo "Error: Unknown step name '${token}' in STEPS."
             echo "       Valid steps: download vi_calc netcdf mean_flat outlier_flat"
-            echo "                    mean_mosaic outlier_mosaic outlier_counts timeseries outlier_gpkg"
+            echo "                    mean_mosaic outlier_mosaic outlier_counts count_valid_mosaic timeseries outlier_gpkg"
             echo "       Valid aliases: all products mosaics outliers"
             exit 1
             ;;
@@ -208,8 +210,9 @@ for step in $ALL_STEPS; do
         mean_mosaic)    num="06"; label="Mean mosaic" ;;
         outlier_mosaic) num="07"; label="Outlier mean mosaic" ;;
         outlier_counts) num="08"; label="Outlier count mosaic" ;;
-        timeseries)     num="09"; label="Time-series stacks" ;;
-        outlier_gpkg)   num="10"; label="Outlier GeoPackage export" ;;
+        timeseries)       num="09"; label="Time-series stacks" ;;
+        count_valid_mosaic) num="11"; label="CountValid mosaic (all download cycles)" ;;
+        outlier_gpkg)     num="10"; label="Outlier GeoPackage export" ;;
     esac
     if step_active "$step"; then
         echo "   [✓] Step $num  $label  ($step)"
@@ -300,6 +303,16 @@ if step_active "outlier_counts"; then
     echo "[Step 08 | outlier_counts] Mosaicking outlier count tiles..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" 08_hls_outlier_count_mosaic.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 08] Complete." | tee -a "$LOGFILE"
+fi
+
+# -----------------------------------------------------------------
+# STEP 11: COUNTVALID MOSAIC (ALL DOWNLOAD CYCLES)
+# -----------------------------------------------------------------
+if step_active "count_valid_mosaic"; then
+    echo "" | tee -a "$LOGFILE"
+    echo "[Step 11 | count_valid_mosaic] Building CountValid mosaic for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" 11_hls_count_valid_mosaic.py 2>&1 | tee -a "$LOGFILE"
+    echo "[Step 11] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
