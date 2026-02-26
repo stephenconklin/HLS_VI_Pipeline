@@ -8,6 +8,13 @@ All notable changes to this project are documented here.
 
 ### Added
 - Read the Docs configuration and Sphinx documentation scaffold (`docs/`)
+
+### Fixed
+- System requirements table in README: added `gdalinfo` (called directly by
+  step 01 for GeoTIFF validation; provided by the conda environment via
+  rasterio's GDAL dependency); clarified that conda is required not just for
+  Python packages but because it supplies native geospatial libraries (GDAL,
+  PROJ, HDF5, GEOS)
 - Per-file download validation with retry logic in step 01
 
 ### Changed
