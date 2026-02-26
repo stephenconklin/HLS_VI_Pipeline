@@ -1,16 +1,19 @@
 #!/bin/bash
 # =================================================================
-# 01a_hls_download_query.sh
-# HLS VI Pipeline — Step 01a: CMR Query & Download
+# 01_hls_download_query.sh
+# HLS VI Pipeline — Step 01: CMR Query & Download
 #
 # Single-cycle NASA CMR API query and parallel band downloader.
-# Called by 01_hls_download.sh for each configured date cycle.
-# Includes storage estimation and interactive user approval.
+# Called by hls_pipeline.sh for each tile in each configured date cycle.
+# Supports estimate mode (returns granule count only) and batch mode
+# (auto-approves and downloads).
 #
-# Usage: ./01a_hls_download_query.sh <tilelist> <date_begin> <date_end> <out_dir>
+# Usage: ./01_hls_download_query.sh <tilelist> <date_begin> <date_end> <out_dir>
 #
 # Author:  Stephen Conklin <stephenconklin@gmail.com>
 #          https://github.com/stephenconklin
+# Adapted in part from: getHLS.sh by NASA HLS Data Resources Team
+#   https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download
 # License: MIT
 # =================================================================
 

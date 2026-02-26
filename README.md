@@ -65,6 +65,7 @@ The **HLS Vegetation Index Pipeline** automates the full workflow from raw HLS s
 - **Consistent tile filtering** — `HLS_TILES` enforces a fixed MGRS tile set uniformly across all 11 steps
 - **Cloud-optimized output** — all GeoTIFF outputs use LZW compression, internal tiling, and predictor settings appropriate to their data type
 - **Pre-flight validation** — the pipeline validates that all bands required for the selected VIs are configured before any step executes
+- **Tile-by-tile processing** — steps 01–03 always run one tile at a time, reducing peak disk usage to roughly one tile's worth of raw data; optional space-saver flags automatically remove raw and/or VI intermediate files after each tile's NetCDF is built
 
 ---
 
@@ -76,7 +77,7 @@ NASA CMR API
      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Step 01 · download                                                 │
-│  01_hls_download.sh + 01a_hls_download_query.sh                     │
+│  01_hls_download_query.sh                                           │
 │  Query CMR API, estimate storage, download raw L30/S30 bands        │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │  Raw GeoTIFF bands (B04, B05/B8A, Fmask)
@@ -118,7 +119,7 @@ NASA CMR API
 
 | Step | Script | Step Name | Description |
 |------|--------|-----------|-------------|
-| 01 | `01_hls_download.sh` | `download` | Query NASA CMR API; download raw HLS granules (L30/S30 bands + Fmask) |
+| 01 | `01_hls_download_query.sh` | `download` | Query NASA CMR API; download raw HLS granules (L30/S30 bands + Fmask) |
 | 02 | `02_hls_vi_calc.py` | `vi_calc` | Compute VI GeoTIFFs; apply configurable bitwise Fmask quality masking |
 | 03 | `03_hls_netcdf_build.py` | `netcdf` | Aggregate per-granule GeoTIFFs into CF-1.8 compliant NetCDF time-series per tile |
 | 04 | `04_hls_mean_reproject.py` | `mean_flat` | Temporal mean per tile; reproject to `TARGET_CRS` |
@@ -170,15 +171,32 @@ HLS data is organized by [MGRS (Military Grid Reference System)](https://hls.gsf
 
 ### 4. Storage Estimate
 
-The download script provides an interactive storage estimate before any data are downloaded. As a rough guide for planning:
+When `download` is active, the pipeline prints a comprehensive storage estimate before any data are downloaded, then prompts for confirmation. The estimate covers all active steps and shows both a Peak and Final figure.
+
+**Steps 01–03 per-granule sizes (empirically calibrated):**
 
 | Product | Approximate size per granule |
 |---------|------------------------------|
-| Raw bands (per granule) | ~60 MB |
-| VI GeoTIFF (per VI) | ~54 MB |
-| NetCDF (per VI) | ~54 MB |
+| Raw bands (NIR, Red, Fmask) | ~45 MB |
+| VI GeoTIFF per VI | ~15 MB |
+| NetCDF contribution per VI | ~12 MB (zlib compression achieves ~7× on NaN-heavy time-series) |
 
-A 10-tile study area with 5 years of data (bi-weekly acquisitions) can require **100–300+ GB** of storage depending on the number of VIs computed.
+**Steps 04–11 per-tile sizes (LZW-compressed estimates):**
+
+| Product | Approximate size |
+|---------|-----------------|
+| Mean reprojected tile (step 04) | ~55 MB per tile per VI |
+| Outlier tiles — mean + count (step 05) | ~5 MB per tile per VI (highly variable — nearly 0 for NDVI with default valid range) |
+| Float32 mosaic contribution (steps 06, 07) | ~35 MB per tile per VI |
+| uint16 mosaic contribution (steps 08, 09) | ~3 MB per tile per VI |
+| Time-series stack per window (step 10) | ~50 MB per tile per VI per window |
+| Outlier GeoPackage (step 11) | variable — depends on outlier rate |
+
+**Peak vs. Final storage:**
+- **Est. Peak** — worst-case simultaneous disk usage during the tile loop: all NetCDF files accumulated so far plus one tile's raw and/or VI files still in progress
+- **Est. Final** — what remains on disk when all active steps complete (with space savers: raw and VI intermediates are deleted; without: they persist)
+
+A 10-tile study area with 5 years of data (bi-weekly acquisitions) running all 11 steps can require **100–300+ GB** depending on VIs and time windows. Enable the space-saver options to minimize peak disk usage — raw and VI intermediate files are deleted per tile as soon as each NetCDF is built.
 
 ---
 
@@ -254,6 +272,7 @@ STEPS="vi_calc netcdf mean_flat"           # Named steps, space-separated
 |-------|-----------|
 | `all` | Steps 01–11 |
 | `products` | Steps 02–11 |
+| `build_nc` | Steps 01–03 |
 | `mosaics` | Steps 06–08 |
 | `outliers` | Steps 05, 07, 08, 11 |
 
@@ -320,6 +339,29 @@ VALID_RANGE_NDVI="-1,1"
 VALID_RANGE_EVI2="-1,2"
 VALID_RANGE_NIRv="-0.5,1"
 ```
+
+### Space Saver Options
+
+The pipeline always processes steps 01–03 one tile at a time — downloading, computing VIs, and building the NetCDF before moving to the next tile. This limits peak disk usage to roughly one tile's worth of raw data at any given moment.
+
+Two optional space-saver flags delete intermediate files for each tile immediately after its NetCDF is built. Both default to `FALSE` and only take effect when `netcdf` is included in `STEPS`.
+
+```bash
+SPACE_SAVER_REMOVE_RAW="FALSE"   # Delete raw HLS band + Fmask files after NetCDF is built
+SPACE_SAVER_REMOVE_VI="FALSE"    # Delete VI GeoTIFF files after NetCDF is built
+```
+
+> **Note:** Both space-saver options can be enabled together. Raw files and VI GeoTIFFs are no longer needed once the NetCDF time-series is complete — all downstream steps (04–11) read only from the NetCDF files.
+
+### Download Approval
+
+Before any data is downloaded, the pipeline prints a storage estimate and prompts for confirmation. To bypass this prompt in automated or non-interactive contexts:
+
+```bash
+SKIP_APPROVAL="FALSE"   # Set TRUE to skip the download confirmation prompt
+```
+
+Failed tiles are skipped with a logged error and the pipeline continues to the next tile. A summary of succeeded and failed tiles is printed at the end of the tile loop.
 
 ### Time-Series Windows
 
@@ -407,7 +449,7 @@ Downloads HLS granules via the NASA CMR API with an interactive storage estimate
 
 - **Inputs:** NASA CMR API (date ranges, tile IDs, cloud/spatial coverage thresholds, band list)
 - **Outputs:** Raw GeoTIFFs in `RAW_HLS_DIR`, organized by sensor/year/tile hierarchy
-- **Key feature:** Estimates total storage (raw + VI + NetCDF) and requires user confirmation before downloading
+- **Key feature:** Prints a comprehensive storage estimate covering all active steps (01–11) with Peak and Final figures, then requires user confirmation before downloading (set `SKIP_APPROVAL=TRUE` to bypass for automated runs)
 - **Credentials required:** `~/.netrc` with NASA Earthdata login
 
 ### Step 02 — VI Calculation
@@ -571,6 +613,24 @@ TIMESLICE_WINDOWS="Peak_Green_2020:2020-06-15|2020-07-31 \
 
 The output stack will have one band per window. Band descriptions (window labels) are stored in the GeoTIFF metadata and are visible in QGIS, ArcGIS Pro, and when reading with rasterio or GDAL.
 
+### Minimizing Disk Usage
+
+For large study areas with limited storage, enable both space-saver options. This keeps only one tile's raw and VI files on disk at a time — all other storage is the accumulated NetCDF outputs.
+
+```bash
+SPACE_SAVER_REMOVE_RAW="TRUE"
+SPACE_SAVER_REMOVE_VI="TRUE"
+STEPS="build_nc"
+```
+
+After all tiles complete steps 01–03, continue with downstream steps:
+
+```bash
+STEPS="mean_flat outlier_flat mean_mosaic outlier_mosaic outlier_counts count_valid_mosaic timeseries outlier_gpkg"
+```
+
+> **Note:** The space-saver options only apply during steps 01–03. Steps 04–11 always operate across all tiles using the NetCDF files.
+
 ### Tuning Valid Ranges
 
 Default valid ranges are broad. Narrow them for domain-specific applications:
@@ -654,7 +714,7 @@ This pipeline was developed with the assistance of [Google Gemini](https://gemin
 ### Adapted Code
 
 **NASA HLS Download Script**
-`01_hls_download.sh` is adapted from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
+`01_hls_download_query.sh` is adapted in part from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
 
 ### HLS Data Citation
 
@@ -711,4 +771,4 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-`01_hls_download.sh` is adapted from NASA's [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download), released by NASA under the [Apache 2.0 License](https://github.com/nasa/HLS-Data-Resources/blob/main/LICENSE).
+`01_hls_download_query.sh` is adapted in part from NASA's [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download), released by NASA under the [Apache 2.0 License](https://github.com/nasa/HLS-Data-Resources/blob/main/LICENSE).
