@@ -157,9 +157,10 @@ chmod 600 ~/.netrc
 
 | Tool | Minimum Version | Notes |
 |------|----------------|-------|
-| conda or mamba | any | For environment management |
+| conda or mamba | any | Required for environment management. conda-forge packages also supply the native geospatial libraries (GDAL, PROJ, HDF5, GEOS) that the pipeline depends on — these are not separate system installs |
 | bash | 3.2+ | Uses standard POSIX-compatible syntax; tested on macOS (ZSH) and Linux |
-| wget or curl | any | Used by download scripts |
+| wget or curl | any | Used by the download script (step 01); the script auto-detects whichever is available |
+| gdalinfo | any | GDAL command-line tool used by step 01 to validate each downloaded GeoTIFF; provided automatically by the conda environment via rasterio's GDAL dependency — no separate installation needed, but the pipeline must be run with the conda environment active |
 
 ### 3. MGRS Tile Identification
 
