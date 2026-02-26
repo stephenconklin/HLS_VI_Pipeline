@@ -1,12 +1,10 @@
+# HLS Vegetation Index Pipeline
+
 ```{toctree}
 :maxdepth: 1
 :caption: Contents
-:hidden:
 
-self
+overview
 configuration
 changelog
-```
-
-```{include} ../README.md
 ```

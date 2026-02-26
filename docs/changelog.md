@@ -8,6 +8,14 @@ All notable changes to this project are documented here.
 
 ### Added
 - Read the Docs configuration and Sphinx documentation scaffold (`docs/`)
+- `docs/overview.md`: comprehensive pipeline guide (full user documentation)
+
+### Changed
+- README.md restructured as a GitHub landing page (elevator pitch, outputs
+  table, key features, quick start, and link to RTD); full documentation
+  moved to `docs/overview.md`
+- `docs/index.md` updated to a hub toctree (overview, configuration,
+  changelog); no longer uses `{include}` to pull README content
 
 ### Fixed
 - System requirements table in README: added `gdalinfo` (called directly by
