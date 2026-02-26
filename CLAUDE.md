@@ -18,7 +18,7 @@ bash hls_pipeline.sh
 
 The `STEPS` variable in `config.env` controls which steps run. Valid values:
 - Named steps: `download`, `vi_calc`, `netcdf`, `mean_flat`, `outlier_flat`, `mean_mosaic`, `outlier_mosaic`, `outlier_counts`, `count_valid_mosaic`, `timeseries`, `outlier_gpkg`
-- Aliases: `all` (steps 01–11), `products` (02–11), `mosaics` (06–08), `outliers` (05+07+08+11)
+- Aliases: `all` (steps 01–11), `products` (02–11), `build_nc` (01–03), `mosaics` (06–08), `outliers` (05+07+08+11)
 
 ## Configuration
 
@@ -31,6 +31,8 @@ All pipeline parameters live in `config.env`. Key sections:
 - **Tile list** (`HLS_TILES`): Space-separated MGRS tile IDs enforced across all steps (02–11); if unset, no filter is applied
 - **Download cycles**: Date ranges in `YYYY-MM-DD|YYYY-MM-DD` format
 - **Time-series windows**: `TIMESLICE_WINDOWS` — space-separated `label:YYYY-MM-DD|YYYY-MM-DD` tokens (labels: alphanumeric + underscores, start ≤ end)
+- **Space savers**: `SPACE_SAVER_REMOVE_RAW` and `SPACE_SAVER_REMOVE_VI` (`TRUE`/`FALSE`) delete raw HLS files and/or VI GeoTIFFs respectively after each tile's NetCDF is built (both default `FALSE`; only fires when `netcdf` is in `STEPS`)
+- **Download approval**: `SKIP_APPROVAL` (`TRUE`/`FALSE`) — bypasses the interactive download confirmation prompt; use for automated/non-interactive runs (default `FALSE`)
 
 Python scripts read all configuration via `os.environ.get()` with fallback defaults — `config.env` is sourced by `hls_pipeline.sh` before dispatching each step.
 
@@ -40,7 +42,7 @@ The pipeline is an 11-step sequential workflow for processing HLS (Harmonized La
 
 | Step | Script | Purpose |
 |------|--------|---------|
-| 01 | `01_hls_download.sh` + `01a_hls_download_query.sh` | Query NASA CMR API; download raw HLS granules (L30/S30 bands + Fmask) |
+| 01 | `01_hls_download_query.sh` | Query NASA CMR API; download raw HLS granules (L30/S30 bands + Fmask) |
 | 02 | `02_hls_vi_calc.py` | Compute VI GeoTIFFs from raw bands; apply bitwise Fmask masking |
 | 03 | `03_hls_netcdf_build.py` | Aggregate per-granule GeoTIFFs into CF-1.8 compliant NetCDF time-series per tile |
 | 04 | `04_hls_mean_reproject.py` | Temporal mean per tile; reproject to `TARGET_CRS` |
@@ -114,6 +116,8 @@ All `np.errstate(divide='ignore', invalid='ignore')` is used to suppress divide-
 **Streaming mosaics** (steps 06, 07, 08, 09): Use `rasterio.merge.merge()` for memory-efficient tiling — peak RAM is one tile + output buffer, not all tiles simultaneously.
 
 **Band requirements**: `hls_pipeline.sh` contains a pre-flight validation block that checks that all bands needed for each requested VI are present in the L30 and S30 band lists before executing any step.
+
+**Tile-by-tile orchestration** (steps 01–03): Steps 01–03 always run inside a tile loop in `hls_pipeline.sh`. The orchestrator temporarily exports `HLS_TILES=<single_tile>` before calling steps 02 and 03 (the Python scripts pick this up via `os.environ.get()` at call time — no script changes needed). Step 01 calls `01_hls_download_query.sh` in `HLS_MODE=batch` with a single-tile temp file. When `download` is active, a pre-flight estimate and approval prompt (bypassed by `SKIP_APPROVAL=TRUE`) run before the tile loop. The estimate covers all active steps: steps 01–03 costs scale by granule count (with a 1.5x per-tile coverage factor for conservative peak), and steps 04–11 costs scale by tile count, VI count, and (for step 10) window count. Space-saver deletion flags (`SPACE_SAVER_REMOVE_RAW`, `SPACE_SAVER_REMOVE_VI`) only fire per tile when the tile succeeded AND `netcdf` is active in `STEPS`; if `netcdf` is not active, no deletion fires and the estimate reflects full accumulation. `set +e` wraps the tile loop so failed tiles are skipped and logged in `TBT_FAILED_TILES`; `set -e` is restored before steps 04–11. `HLS_TILES` is restored to the full list after the loop.
 
 ## Filename Conventions
 
