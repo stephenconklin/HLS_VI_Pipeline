@@ -118,13 +118,17 @@ if [ "$HLS_MODE" == "estimate" ]; then
 fi
 
 ### --- DOWNLOAD FUNCTION ---
+# Downloads all band files for a single granule, validating each file with
+# gdalinfo after download. Corrupt or missing files are retried up to
+# MAX_RETRIES times. If any file cannot be downloaded cleanly, the entire
+# granule directory is removed so step 02 skips it rather than crashing.
 function download_granule() {
     fullpath=$1
     Fmaskbase=$(basename $fullpath)
-    
+
     granule=$(echo $Fmaskbase | awk -F"." '{print $1 "." $2 "." $3 "." $4 "." $5 "." $6}')
     allfile=/tmp/tmp.files.in.${granule}.$$.txt
-    grep $granule $flist > $allfile 
+    grep $granule $flist > $allfile
 
     set $(echo $Fmaskbase | awk -F"." '{ print $2, substr($3,2,5), substr($4,1,4)}')
     type=$1; tileid=$2; year=$3
@@ -133,15 +137,50 @@ function download_granule() {
     mkdir -p $outdir
 
     cookie=/tmp/tmp.cookie.$granule.$$
+    MAX_RETRIES=3
+    granule_ok=true
 
     echo "Downloading into $outdir"
-    if [ $WGET = true ]; then
-        wget -q -N -i $allfile -P $outdir
-    else
-        ( cd $outdir && cat $allfile | xargs curl --cookie-jar $cookie -n -s -L -C - --remote-name-all )
-        rm -f $cookie
+
+    while IFS= read -r url; do
+        fname=$(basename "$url")
+        outfile="$outdir/$fname"
+
+        # Skip if the file already exists and is a valid raster
+        if gdalinfo "$outfile" >/dev/null 2>&1; then
+            continue
+        fi
+
+        # Download with per-attempt retry and gdalinfo validation
+        downloaded=false
+        for attempt in $(seq 1 $MAX_RETRIES); do
+            rm -f "$outfile"
+            if [ $WGET = true ]; then
+                wget -q -O "$outfile" "$url"
+            else
+                curl --cookie-jar "$cookie" -n -s -L --output "$outfile" "$url"
+            fi
+            if gdalinfo "$outfile" >/dev/null 2>&1; then
+                downloaded=true
+                break
+            fi
+            echo "   [WARNING] Attempt $attempt/$MAX_RETRIES failed for $fname (not a valid raster)"
+            sleep $((attempt * 2))
+        done
+
+        if [ "$downloaded" = false ]; then
+            echo "   [ERROR] Failed to download valid file after $MAX_RETRIES attempts: $fname"
+            rm -f "$outfile"
+            granule_ok=false
+        fi
+    done < "$allfile"
+
+    rm -f "$allfile" "$cookie"
+
+    if [ "$granule_ok" = false ]; then
+        echo "   [ERROR] Removing incomplete granule directory: $outdir"
+        rm -rf "$outdir"
     fi
-    rm -f $allfile
 }
 export -f download_granule
 
