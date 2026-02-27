@@ -710,9 +710,7 @@ If `TIMESLICE_ENABLED` is not set to `"TRUE"`, Step 10 will skip processing. Als
 - `02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)
 - `03_hls_netcdf_build.py` (NetCDF time-series assembly)
 
-### AI Assistance
-
-This pipeline was developed with the assistance of [Google Gemini](https://gemini.google.com/) and [Anthropic Claude / Claude Code](https://claude.ai/code). These tools assisted with code generation and refinement under the direction and review of the authors.
+**AI Assistance** — This pipeline was developed with the assistance of [Google Gemini](https://gemini.google.com/) and [Anthropic Claude / Claude Code](https://claude.ai/code). These tools assisted with code generation and refinement under the direction and review of the authors.
 
 ### Adapted Code
 
