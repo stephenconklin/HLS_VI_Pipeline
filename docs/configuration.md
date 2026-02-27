@@ -120,7 +120,6 @@ current run. Both flags are safe to enable together.
 |-----------|--------|---------|-------------|
 | `SPACE_SAVER_REMOVE_RAW` | `TRUE` / `FALSE` | `FALSE` | Delete downloaded HLS band + Fmask files from `RAW_HLS_DIR` after each tile's NetCDF is built |
 | `SPACE_SAVER_REMOVE_VI` | `TRUE` / `FALSE` | `FALSE` | Delete per-granule VI GeoTIFFs from `VI_OUTPUT_DIR` after each tile's NetCDF is built |
-| `SKIP_APPROVAL` | `TRUE` / `FALSE` | `FALSE` | Bypass the interactive download approval prompt. Set `TRUE` for automated or non-interactive runs |
 
 ---
 
