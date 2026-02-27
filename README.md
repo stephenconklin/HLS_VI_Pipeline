@@ -111,8 +111,35 @@ bash hls_pipeline.sh
 ```
 ---
 
+## Credits & Acknowledgments
+
+### Authors
+
+**Stephen Conklin**, Geospatial Analyst — Pipeline architecture, orchestration, and all original code · [github.com/stephenconklin](https://github.com/stephenconklin)
+
+**G. Burch Fisher, PhD**, Research Scientist — Conceptual guidance and original code adapted for:
+- `02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)
+- `03_hls_netcdf_build.py` (NetCDF time-series assembly)
+
+### AI Assistance
+
+This pipeline was developed with the assistance of [Google Gemini](https://gemini.google.com/) and [Anthropic Claude / Claude Code](https://claude.ai/code). These tools assisted with code generation and refinement under the direction and review of the authors.
+
+### Adapted Code
+
+**NASA HLS Download Script**
+`01_hls_download_query.sh` is adapted in part from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
+
+### HLS Data Citation
+
+Users of this pipeline who publish results should cite the HLS datasets:
+
+> Masek, J., Ju, J., Roger, J.-C., Skakun, S., Vermote, E., Claverie, M., Dungan, J., Yin, Z., Freitag, B., Justice, C. (2021). *HLS Operational Land Imager Surface Reflectance and TOA Brightness Daily Global 30m v2.0* [Data set]. NASA EOSDIS Land Processes DAAC. https://doi.org/10.5067/HLS/HLSL30.002
+
+> Skakun, S., Ju, J., Roger, J.-C., Vermote, E., Masek, J., Justice, C. (2021). *HLS Sentinel-2 Multi-spectral Instrument Surface Reflectance Daily Global 30m v2.0* [Data set]. NASA EOSDIS Land Processes DAAC. https://doi.org/10.5067/HLS/HLSS30.002
+
+---
+
 ## License
 
 [MIT License](LICENSE) · Copyright (c) 2026 Stephen Conklin
-
-`01_hls_download_query.sh` is adapted in part from NASA's [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download), released under the [Apache 2.0 License](https://github.com/nasa/HLS-Data-Resources/blob/main/LICENSE).
