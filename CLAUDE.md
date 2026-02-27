@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Commit Style
+
+Do NOT include `Co-Authored-By: Claude` trailers in any commit messages for this project.
+
 ## Environment Setup
 
 ```bash
