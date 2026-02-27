@@ -124,6 +124,16 @@ current run. Both flags are safe to enable together.
 
 ---
 
+## Download Approval
+
+Before any data is downloaded, the pipeline prints a storage estimate and prompts for confirmation. To bypass this prompt in automated or non-interactive contexts:
+
+| Parameter | Values | Default | Description |
+|-----------|--------|---------|-------------|
+| `SKIP_APPROVAL` | `TRUE` / `FALSE` | `FALSE` | Bypass the interactive download approval prompt. Set `TRUE` for automated or non-interactive runs |
+
+---
+
 ## Download Settings
 
 | Parameter | Default | Description |

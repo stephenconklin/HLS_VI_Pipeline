@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS-lightgrey.svg)]()
 [![Data: HLS v2.0](https://img.shields.io/badge/data-HLS%20v2.0-brightgreen.svg)](https://hls.gsfc.nasa.gov/)
-[![Docs](https://readthedocs.org/projects/hls-vi-pipeline/badge/?version=latest)](https://hls-vi-pipeline.readthedocs.io/en/latest/)
+[![Docs](https://readthedocs.org/projects/hls-vi-pipeline/badge/?version=latest)](https://hls-vi-pipeline.readthedocs.io/en/latest/overview.html)
 
 A production-ready, 11-step processing pipeline for computing and analyzing vegetation indices from NASA's Harmonized Landsat and Sentinel-2 (HLS) surface reflectance data. Built for researchers across ecology, agriculture, land management, and remote sensing who need reproducible, time-series vegetation analysis at scale.
 
@@ -14,7 +14,7 @@ A production-ready, 11-step processing pipeline for computing and analyzing vege
 
 Full documentation — prerequisites, configuration reference, step-by-step guide, output products, and troubleshooting — is available at:
 
-**[https://hls-vi-pipeline.readthedocs.io](https://hls-vi-pipeline.readthedocs.io)**
+**[https://hls-vi-pipeline.readthedocs.io/en/latest/overview.html](https://hls-vi-pipeline.readthedocs.io/en/latest/overview.html)**
 
 ---
 <!--
