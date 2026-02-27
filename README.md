@@ -10,21 +10,58 @@ A production-ready, 11-step processing pipeline for computing and analyzing vege
 
 ---
 
-<!-- ============================================================
-     PHOTO — replace the line below with your image path or URL
-     Example: ![NDVI Mosaic](docs/images/ndvi_mosaic.png)
-     ============================================================ -->
+## Documentation
+
+Full documentation — prerequisites, configuration reference, step-by-step guide, output products, and troubleshooting — is available at:
+
+**[https://hls-vi-pipeline.readthedocs.io](https://hls-vi-pipeline.readthedocs.io)**
+
+---
+<!--
+<div style="display: flex; flex-wrap: wrap; gap: 10px; text-align: center;">
+
+  <div style="flex: 1 1 45%;">
+    <img src="https://via.placeholder.com/300x200" alt="Image 1" style="max-width: 100%;">
+    <p><i>Caption for Image 1</i></p>
+  </div>
+
+  <div style="flex: 1 1 45%;">
+    <img src="https://via.placeholder.com/300x200" alt="Image 2" style="max-width: 100%;">
+    <p><i>Caption for Image 2</i></p>
+  </div>
+
+  <div style="flex: 1 1 45%;">
+    <img src="https://via.placeholder.com/300x200" alt="Image 3" style="max-width: 100%;">
+    <p><i>Caption for Image 3</i></p>
+  </div>
+
+  <div style="flex: 1 1 45%;">
+    <img src="https://via.placeholder.com/300x200" alt="Image 4" style="max-width: 100%;">
+    <p><i>Caption for Image 4</i></p>
+  </div>
+
+  <div style="flex: 1 1 45%;">
+    <img src="https://via.placeholder.com/300x200" alt="Image 5" style="max-width: 100%;">
+    <p><i>Caption for Image 5</i></p>
+  </div>
+
+  <div style="flex: 1 1 45%;">
+    <img src="https://via.placeholder.com/300x200" alt="Image 6" style="max-width: 100%;">
+    <p><i>Caption for Image 6</i></p>
+  </div>
+
+</div>
 
 ---
 
-<!-- ============================================================
+============================================================
      YOUTUBE VIDEO — replace YOUR_VIDEO_ID with your video ID
      Example ID: dQw4w9WgXcQ  (from youtube.com/watch?v=dQw4w9WgXcQ)
      ============================================================
 [![Watch the demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
--->
 
 ---
+-->
 
 ## What It Produces
 
@@ -72,15 +109,6 @@ conda activate hls_pipeline
 # 2. Edit config.env, then run
 bash hls_pipeline.sh
 ```
-
----
-
-## Documentation
-
-Full documentation — prerequisites, configuration reference, step-by-step guide, output products, and troubleshooting — is available at:
-
-**[https://hls-vi-pipeline.readthedocs.io](https://hls-vi-pipeline.readthedocs.io)**
-
 ---
 
 ## License
