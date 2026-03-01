@@ -25,7 +25,7 @@ import glob
 import warnings
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -99,7 +99,7 @@ def process_file(args):
             outlier_mean = outlier_data.mean(dim='time', skipna=True).compute()
 
         outlier_mean.rio.write_crs(source_crs, inplace=True)
-        reproj_mean = outlier_mean.rio.reproject(TARGET_CRS, resolution=30)
+        reproj_mean = outlier_mean.rio.reproject(TARGET_CRS, resolution=reproject_resolution(TARGET_CRS))
         reproj_mean.encoding.clear()
         reproj_mean.rio.to_raster(mean_path, compress='LZW', tiled=True,
                                    dtype='float32', nodata=np.nan)
@@ -109,7 +109,7 @@ def process_file(args):
             outlier_count = outlier_data.count(dim='time').compute()
 
         outlier_count.rio.write_crs(source_crs, inplace=True)
-        reproj_count = outlier_count.rio.reproject(TARGET_CRS, resolution=30)
+        reproj_count = outlier_count.rio.reproject(TARGET_CRS, resolution=reproject_resolution(TARGET_CRS))
         reproj_count = reproj_count.fillna(0).astype('uint16')
         reproj_count.rio.write_nodata(0, encoded=True, inplace=True)
         reproj_count.encoding.clear()

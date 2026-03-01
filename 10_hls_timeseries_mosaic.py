@@ -37,7 +37,7 @@ import rasterio
 from rasterio.merge import merge as rasterio_merge
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -193,8 +193,8 @@ def _process_tile_window(args: dict) -> dict:
         result.rio.write_crs(source_crs, inplace=True)
         count_valid.rio.write_crs(source_crs, inplace=True)
 
-        reproj_mean  = result.rio.reproject(target_crs, resolution=30, nodata=np.nan)
-        reproj_count = count_valid.rio.reproject(target_crs, resolution=30, nodata=0)
+        reproj_mean  = result.rio.reproject(target_crs, resolution=reproject_resolution(target_crs), nodata=np.nan)
+        reproj_count = count_valid.rio.reproject(target_crs, resolution=reproject_resolution(target_crs), nodata=0)
         reproj_count = reproj_count.fillna(0).astype('uint16')
 
         safe_label = re.sub(r'[^A-Za-z0-9_]', '_', window_label)

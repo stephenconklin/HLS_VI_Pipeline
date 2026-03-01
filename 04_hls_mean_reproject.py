@@ -22,7 +22,7 @@ import glob
 import warnings
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -81,7 +81,7 @@ def process_file(args):
             mean_val = valid_data.mean(dim='time', skipna=True, keep_attrs=True).compute()
 
         mean_val.rio.write_crs(source_crs, inplace=True)
-        reprojected = mean_val.rio.reproject(TARGET_CRS, resolution=30, nodata=np.nan)
+        reprojected = mean_val.rio.reproject(TARGET_CRS, resolution=reproject_resolution(TARGET_CRS), nodata=np.nan)
         reprojected.rio.to_raster(
             output_path, compress='LZW', tiled=True, dtype='float32', nodata=np.nan
         )

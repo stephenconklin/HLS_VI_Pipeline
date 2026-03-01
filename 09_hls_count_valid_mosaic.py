@@ -34,7 +34,7 @@ import rioxarray         # noqa: F401 — activates .rio accessor
 import rasterio
 from rasterio.merge import merge as rasterio_merge
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -103,7 +103,7 @@ def _process_tile(args: dict) -> dict:
             count_valid = valid.count(dim='time').compute()
 
         count_valid.rio.write_crs(source_crs, inplace=True)
-        reproj_count = count_valid.rio.reproject(target_crs, resolution=30, nodata=0)
+        reproj_count = count_valid.rio.reproject(target_crs, resolution=reproject_resolution(target_crs), nodata=0)
         reproj_count = reproj_count.fillna(0).astype('uint16')
 
         count_tmp = os.path.join(temp_dir, f"{tile_id}_{vi_type}_count.tif")
