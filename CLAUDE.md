@@ -28,7 +28,8 @@ The `STEPS` variable in `config.env` controls which steps run. Valid values:
 
 All pipeline parameters live in `config.env`. Key sections:
 - **Paths**: `BASE_DIR`, `LOG_DIR`, `RAW_HLS_DIR`, `VI_OUTPUT_DIR`, `NETCDF_DIR`, `REPROJECTED_DIR`, `REPROJECTED_DIR_OUTLIERS`, `MOSAIC_DIR`, `TIMESLICE_OUTPUT_DIR`, `OUTLIER_GPKG_DIR`
-- **Processing**: `NUM_WORKERS`, `CHUNK_SIZE`, `TARGET_CRS` (default `EPSG:6350` — NAD83 Conus Albers, 30 m output resolution)
+- **Processing**: `NUM_WORKERS`, `CHUNK_SIZE`, `TARGET_CRS` (default `EPSG:6350` — NAD83 Conus Albers, 30 m output resolution; must be a projected CRS in metres)
+- **Output format**: `NETCDF_COMPLEVEL` (int 0–9, default `1` — zlib level for step 03 NetCDF); `GEOTIFF_COMPRESS` (default `LZW` — codec for all GeoTIFF outputs, steps 02 + 04–10); `GEOTIFF_BLOCK_SIZE` (int, default `512` — tile block dimension for tiled GeoTIFFs, steps 04–10)
 - **VI selection**: `PROCESSED_VIS` — space-separated list of `NDVI`, `EVI2`, `NIRv`
 - **Fmask masking**: Individual boolean flags for cirrus, cloud, adjacent cloud, shadow, snow/ice, water, and aerosol mode (`NONE`/`HIGH`/`MODERATE`/`LOW`)
 - **Valid ranges**: Per-VI outlier bounds via `VALID_RANGE_NDVI`, `VALID_RANGE_EVI2`, `VALID_RANGE_NIRv` (format: `"min,max"`; defaults: NDVI `"-1,1"`, EVI2 `"-1,2"`, NIRv `"-0.5,1"`)

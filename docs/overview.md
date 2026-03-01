@@ -385,7 +385,15 @@ Format: `label:YYYY-MM-DD|YYYY-MM-DD`, space-separated. Labels must be alphanume
 ```bash
 NUM_WORKERS=8            # Parallel worker processes — set to available CPU cores
 CHUNK_SIZE=10            # NetCDF time slices per dask chunk
-TARGET_CRS="EPSG:6350"  # Output CRS (default: NAD83 Conus Albers Equal Area)
+TARGET_CRS="EPSG:6350"  # Output CRS — must be a projected CRS (metres)
+```
+
+### Output Format
+
+```bash
+NETCDF_COMPLEVEL=1       # zlib compression level for NetCDF files (0–9; 1 = fast, 9 = smallest)
+GEOTIFF_COMPRESS="LZW"  # GeoTIFF codec: LZW (default), DEFLATE, ZSTD, NONE
+GEOTIFF_BLOCK_SIZE=512  # Internal tile block size in pixels (512 for GIS; 256 for COG/web)
 ```
 
 ---
@@ -657,14 +665,17 @@ Reduce this value if you encounter out-of-memory errors during Steps 04, 05, or 
 
 ### Changing the Output CRS
 
-The default CRS is `EPSG:6350` (NAD83 Conus Albers Equal Area). Change `TARGET_CRS` to any EPSG code supported by PROJ:
+The default CRS is `EPSG:6350` (NAD83 Conus Albers Equal Area). Change `TARGET_CRS` to any projected CRS supported by PROJ:
 
 ```bash
 TARGET_CRS="EPSG:32618"   # UTM Zone 18N (WGS84)
+TARGET_CRS="EPSG:9221"    # South African Albers Equal Area
 TARGET_CRS="EPSG:3857"    # Web Mercator
 ```
 
 All reprojected outputs and mosaics (Steps 04–11) will use the new CRS. The CRS code (dots stripped) is embedded in output filenames (e.g., `EPSG6350`).
+
+> **Note:** `TARGET_CRS` must be a **projected CRS** (linear units such as metres). If a geographic CRS (degrees) is set, the pipeline will accept it but print a `[WARN]` and convert the 30 m output resolution to an approximate degree equivalent — which is not equal-area and not recommended for pixel-level VI analysis.
 
 ---
 

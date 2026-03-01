@@ -82,7 +82,7 @@ def process_netcdf_chunk(chunk_info):
             # (You might need to parse this upstream if you want a clean EPSG code)
             
             # Data Variable
-            vi_var = nc.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True, complevel=1, fill_value=np.nan)
+            vi_var = nc.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True, complevel=chunk_info.get('complevel', 1), fill_value=np.nan)
             vi_var.grid_mapping = 'spatial_ref' # Link data to CRS variable
             
             sensor_var = nc.createVariable('sensor', 'S3', ('time',))
@@ -116,6 +116,7 @@ class HLSNetCDFAggregator:
         self.output_folder = Path(output_folder)
         self.output_folder.mkdir(parents=True, exist_ok=True)
         self.vegetation_indices = wanted_vis if wanted_vis else ['NDVI', 'EVI2', 'NIRv']
+        self.netcdf_complevel = int(os.environ.get("NETCDF_COMPLEVEL", 1))
         
     def extract_metadata_from_filename(self, filename):
         name = filename.name
@@ -185,7 +186,7 @@ class HLSNetCDFAggregator:
                     crs_var = dst.createVariable('spatial_ref', 'i4')
                     crs_var.spatial_ref = crs_wkt
 
-                vi_var = dst.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True)
+                vi_var = dst.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True, complevel=self.netcdf_complevel)
                 if has_spatial_ref: vi_var.grid_mapping = 'spatial_ref'
                 
                 s_var = dst.createVariable('sensor', 'S3', ('time',))
@@ -290,7 +291,8 @@ class HLSNetCDFAggregator:
                             'x_coords': x_coords,
                             'y_coords': y_coords,
                             'crs_wkt': crs_wkt,
-                            'shape': shape
+                            'shape': shape,
+                            'complevel': self.netcdf_complevel,
                         })
                     
                     # Process Chunks in Parallel
@@ -329,8 +331,13 @@ if __name__ == "__main__":
         print("Error: Config not loaded. Ensure VI_OUTPUT_DIR and NETCDF_DIR are set.")
         exit(1)
 
+    try:
+        netcdf_complevel = max(0, min(9, int(os.environ.get("NETCDF_COMPLEVEL", 1))))
+    except ValueError:
+        netcdf_complevel = 1
+
     print(f"HLS NetCDF Aggregation (Indices: {processed_vis})")
-    print(f"Workers: {n_workers} | Chunk Size: {chunk_size}")
+    print(f"Workers: {n_workers} | Chunk Size: {chunk_size} | NetCDF complevel: {netcdf_complevel}")
     
     aggregator = HLSNetCDFAggregator(input_folder, netcdf_output_folder, wanted_vis=processed_vis)
     aggregator.run(chunk_size=chunk_size, n_workers=n_workers)

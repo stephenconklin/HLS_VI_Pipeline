@@ -38,7 +38,17 @@ All paths are relative to `BASE_DIR` by default.
 |-----------|---------|-------------|
 | `NUM_WORKERS` | `8` | Parallel worker processes for compute-intensive steps (02, 04, 05, 09, 10, 11) |
 | `CHUNK_SIZE` | `10` | Tiles loaded per dask chunk during xarray processing (steps 04, 05, 09, 10) |
-| `TARGET_CRS` | `EPSG:6350` | Output CRS for all reprojected and mosaicked products (steps 04–11). `EPSG:6350` is NAD83 Conus Albers at 30 m resolution |
+| `TARGET_CRS` | `EPSG:6350` | Output CRS for all reprojected and mosaicked products (steps 04–11). Must be a projected CRS (linear units such as metres). A geographic CRS (degrees) is accepted but produces a `[WARN]` and uses an approximate degree-based resolution |
+
+---
+
+## Output Format
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `NETCDF_COMPLEVEL` | `1` | zlib compression level for NetCDF time-series files (step 03). Range 0–9: `0` = no compression, `1` = fastest/least, `9` = most. Level 1 gives substantial size reduction with minimal CPU cost |
+| `GEOTIFF_COMPRESS` | `LZW` | Compression codec for all GeoTIFF outputs (steps 02, 04–10). Any codec supported by your GDAL build: `LZW` (default, fast, broadly compatible), `DEFLATE`, `ZSTD`, `NONE` |
+| `GEOTIFF_BLOCK_SIZE` | `512` | Internal tile block dimension (pixels) for all tiled GeoTIFF outputs (steps 04–10). Must be a power of two. `512` is standard for desktop GIS workflows; `256` is preferred for Cloud-Optimized GeoTIFFs |
 
 ---
 

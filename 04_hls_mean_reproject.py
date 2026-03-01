@@ -22,16 +22,18 @@ import glob
 import warnings
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
 # --- CONFIGURATION FROM ENV ---
 INPUT_FOLDER  = os.environ.get("NETCDF_DIR",      "")
 OUTPUT_FOLDER = os.environ.get("REPROJECTED_DIR", "")
-TARGET_CRS    = os.environ.get("TARGET_CRS",      "EPSG:6350")
-PROCESSED_VIS = os.environ.get("PROCESSED_VIS",  "NDVI EVI2 NIRv").split()
-N_WORKERS     = int(os.environ.get("NUM_WORKERS", 4))
+TARGET_CRS        = os.environ.get("TARGET_CRS",         "EPSG:6350")
+PROCESSED_VIS     = os.environ.get("PROCESSED_VIS",     "NDVI EVI2 NIRv").split()
+N_WORKERS         = int(os.environ.get("NUM_WORKERS",    4))
+GEOTIFF_COMPRESS  = os.environ.get("GEOTIFF_COMPRESS",  "LZW").upper()
+GEOTIFF_BLOCK_SIZE = int(os.environ.get("GEOTIFF_BLOCK_SIZE", 512))
 
 if not INPUT_FOLDER or not OUTPUT_FOLDER:
     raise ValueError("NETCDF_DIR or REPROJECTED_DIR not set.")
@@ -81,9 +83,11 @@ def process_file(args):
             mean_val = valid_data.mean(dim='time', skipna=True, keep_attrs=True).compute()
 
         mean_val.rio.write_crs(source_crs, inplace=True)
-        reprojected = mean_val.rio.reproject(TARGET_CRS, resolution=30, nodata=np.nan)
+        reprojected = mean_val.rio.reproject(TARGET_CRS, resolution=reproject_resolution(TARGET_CRS), nodata=np.nan)
         reprojected.rio.to_raster(
-            output_path, compress='LZW', tiled=True, dtype='float32', nodata=np.nan
+            output_path, compress=GEOTIFF_COMPRESS, tiled=True,
+            blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
+            dtype='float32', nodata=np.nan
         )
         ds.close()
         return f"OK: {vi_type} / {filename}"

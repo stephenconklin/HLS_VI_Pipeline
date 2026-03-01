@@ -34,7 +34,7 @@ import rioxarray         # noqa: F401 — activates .rio accessor
 import rasterio
 from rasterio.merge import merge as rasterio_merge
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -44,8 +44,10 @@ warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarni
 NETCDF_DIR    = os.environ.get("NETCDF_DIR",   "")
 MOSAIC_DIR    = os.environ.get("MOSAIC_DIR",   "")
 TARGET_CRS    = os.environ.get("TARGET_CRS",   "EPSG:6350")
-PROCESSED_VIS = os.environ.get("PROCESSED_VIS", "NDVI EVI2 NIRv").split()
-N_WORKERS     = int(os.environ.get("NUM_WORKERS", 4))
+PROCESSED_VIS      = os.environ.get("PROCESSED_VIS",      "NDVI EVI2 NIRv").split()
+N_WORKERS          = int(os.environ.get("NUM_WORKERS",     4))
+GEOTIFF_COMPRESS   = os.environ.get("GEOTIFF_COMPRESS",   "LZW").upper()
+GEOTIFF_BLOCK_SIZE = int(os.environ.get("GEOTIFF_BLOCK_SIZE", 512))
 
 if not NETCDF_DIR or not MOSAIC_DIR:
     raise ValueError("NETCDF_DIR or MOSAIC_DIR not set in environment.")
@@ -103,13 +105,15 @@ def _process_tile(args: dict) -> dict:
             count_valid = valid.count(dim='time').compute()
 
         count_valid.rio.write_crs(source_crs, inplace=True)
-        reproj_count = count_valid.rio.reproject(target_crs, resolution=30, nodata=0)
+        reproj_count = count_valid.rio.reproject(target_crs, resolution=reproject_resolution(target_crs), nodata=0)
         reproj_count = reproj_count.fillna(0).astype('uint16')
 
         count_tmp = os.path.join(temp_dir, f"{tile_id}_{vi_type}_count.tif")
         reproj_count.encoding.clear()
         reproj_count.rio.write_nodata(0, encoded=True, inplace=True)
-        reproj_count.rio.to_raster(count_tmp, compress='LZW', dtype='uint16')
+        reproj_count.rio.to_raster(count_tmp, compress=GEOTIFF_COMPRESS,
+                                   blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
+                                   dtype='uint16')
 
         ds.close()
         return {
@@ -224,11 +228,11 @@ def build_count_valid_mosaic(processed_vis: list):
                     'count':     1,
                     'crs':       crs,
                     'transform': transform,
-                    'compress':  'LZW',
-                    'tiled':     True,
-                    'blockxsize': 512,
-                    'blockysize': 512,
-                    'predictor': 2,
+                    'compress':   GEOTIFF_COMPRESS,
+                    'tiled':      True,
+                    'blockxsize': GEOTIFF_BLOCK_SIZE,
+                    'blockysize': GEOTIFF_BLOCK_SIZE,
+                    'predictor':  2,
                 }
                 with rasterio.open(output_path, 'w', **profile) as dst:
                     dst.write(mosaic, 1)

@@ -95,6 +95,36 @@ def get_valid_range(vi_type: str) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# Reproject resolution (CRS-unit-aware)
+# ---------------------------------------------------------------------------
+
+def reproject_resolution(target_crs: str, meters: float = 30.0) -> float:
+    """Return the reproject resolution in target CRS units for a desired ground
+    resolution in metres.
+
+    For projected CRS (linear units, e.g. metres) returns ``meters`` unchanged.
+    For geographic CRS (angular units, e.g. degrees) converts to decimal degrees
+    using an equatorial approximation (1° ≈ 111 320 m) and prints a warning,
+    since geographic CRS is generally not recommended for pixel-level VI analysis.
+
+    Args:
+        target_crs: Any CRS string accepted by pyproj (EPSG code, WKT, PROJ str).
+        meters:     Desired ground resolution in metres. Default 30.
+    """
+    from pyproj import CRS as ProjCRS
+    crs = ProjCRS.from_user_input(target_crs)
+    if crs.is_geographic:
+        deg = meters / 111_320.0
+        print(
+            f"  [WARN] TARGET_CRS '{target_crs}' is a geographic CRS (units: degrees). "
+            f"Resolution converted from {meters} m to ≈{deg:.6f}°. "
+            f"A projected CRS (metres) is strongly recommended for pixel-level VI analysis."
+        )
+        return deg
+    return meters
+
+
+# ---------------------------------------------------------------------------
 # CRS detection (xarray / rioxarray datasets)
 # ---------------------------------------------------------------------------
 

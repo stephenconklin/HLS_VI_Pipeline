@@ -26,6 +26,8 @@ from hls_utils import filter_by_configured_tiles
 # Suppress "NotGeoreferencedWarning" which can be spammy with HLS data
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
+GEOTIFF_COMPRESS = os.environ.get("GEOTIFF_COMPRESS", "LZW").upper()
+
 class HLSProcessor:
     def __init__(self, s30_dir, l30_dir, output_dir, wanted_vis=None):
         self.s30_dir = s30_dir
@@ -156,7 +158,7 @@ class HLSProcessor:
                 # Calculate Indices
                 ndvi, evi2, nirv = self.calculate_indices(red, nir)
                 
-                profile.update(dtype=rasterio.float32, nodata=np.nan, count=1, compress='lzw')
+                profile.update(dtype=rasterio.float32, nodata=np.nan, count=1, compress=GEOTIFF_COMPRESS)
                 
                 # Write outputs
                 if "NDVI" in self.wanted_vis:

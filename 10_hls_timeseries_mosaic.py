@@ -37,7 +37,7 @@ import rasterio
 from rasterio.merge import merge as rasterio_merge
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -48,9 +48,11 @@ NETCDF_DIR     = os.environ.get("NETCDF_DIR",          "")
 OUTPUT_DIR     = os.environ.get("TIMESLICE_OUTPUT_DIR", "")
 TARGET_CRS     = os.environ.get("TARGET_CRS",           "EPSG:6350")
 PROCESSED_VIS  = os.environ.get("PROCESSED_VIS",        "NDVI EVI2 NIRv").split()
-N_WORKERS      = int(os.environ.get("NUM_WORKERS",       4))
-TIMESLICE_STAT = os.environ.get("TIMESLICE_STAT",       "mean").lower()
-_WINDOWS_RAW   = os.environ.get("TIMESLICE_WINDOWS",    "")
+N_WORKERS          = int(os.environ.get("NUM_WORKERS",       4))
+TIMESLICE_STAT     = os.environ.get("TIMESLICE_STAT",       "mean").lower()
+_WINDOWS_RAW       = os.environ.get("TIMESLICE_WINDOWS",    "")
+GEOTIFF_COMPRESS   = os.environ.get("GEOTIFF_COMPRESS",     "LZW").upper()
+GEOTIFF_BLOCK_SIZE = int(os.environ.get("GEOTIFF_BLOCK_SIZE", 512))
 
 if not NETCDF_DIR or not OUTPUT_DIR:
     raise ValueError("NETCDF_DIR or TIMESLICE_OUTPUT_DIR not set in environment.")
@@ -193,8 +195,8 @@ def _process_tile_window(args: dict) -> dict:
         result.rio.write_crs(source_crs, inplace=True)
         count_valid.rio.write_crs(source_crs, inplace=True)
 
-        reproj_mean  = result.rio.reproject(target_crs, resolution=30, nodata=np.nan)
-        reproj_count = count_valid.rio.reproject(target_crs, resolution=30, nodata=0)
+        reproj_mean  = result.rio.reproject(target_crs, resolution=reproject_resolution(target_crs), nodata=np.nan)
+        reproj_count = count_valid.rio.reproject(target_crs, resolution=reproject_resolution(target_crs), nodata=0)
         reproj_count = reproj_count.fillna(0).astype('uint16')
 
         safe_label = re.sub(r'[^A-Za-z0-9_]', '_', window_label)
@@ -202,11 +204,15 @@ def _process_tile_window(args: dict) -> dict:
         count_tmp  = os.path.join(temp_dir, f"{tile_id}_{vi_type}_{safe_label}_count.tif")
 
         reproj_mean.encoding.clear()
-        reproj_mean.rio.to_raster(mean_tmp, compress='LZW', dtype='float32', nodata=np.nan)
+        reproj_mean.rio.to_raster(mean_tmp, compress=GEOTIFF_COMPRESS,
+                                   blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
+                                   dtype='float32', nodata=np.nan)
 
         reproj_count.encoding.clear()
         reproj_count.rio.write_nodata(0, encoded=True, inplace=True)
-        reproj_count.rio.to_raster(count_tmp, compress='LZW', dtype='uint16')
+        reproj_count.rio.to_raster(count_tmp, compress=GEOTIFF_COMPRESS,
+                                    blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
+                                    dtype='uint16')
 
         ds.close()
         return {
@@ -256,8 +262,9 @@ def _append_band_to_stack(stack_path: str, band_data: np.ndarray,
             'driver': 'GTiff', 'dtype': dtype, 'nodata': nodata,
             'width': band_data.shape[1], 'height': band_data.shape[0],
             'count': 1, 'crs': crs, 'transform': transform,
-            'compress': 'LZW', 'tiled': True,
-            'blockxsize': 512, 'blockysize': 512, 'predictor': predictor,
+            'compress': GEOTIFF_COMPRESS, 'tiled': True,
+            'blockxsize': GEOTIFF_BLOCK_SIZE, 'blockysize': GEOTIFF_BLOCK_SIZE,
+            'predictor': predictor,
             'BIGTIFF': 'YES',   # 64-bit offsets — required when stack exceeds 4 GB
         }
         with rasterio.open(stack_path, 'w', **profile) as dst:
