@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2026-02-28
+
+### Added
+- **`NETCDF_COMPLEVEL`** — configurable zlib compression level (0–9, default `1`)
+  for NetCDF time-series files written by step 03. Threaded through
+  `HLSNetCDFAggregator` into `chunk_info` dicts (worker) and `merge_chunks`.
+- **`GEOTIFF_COMPRESS`** — configurable compression codec (default `LZW`) for all
+  GeoTIFF outputs in steps 02 and 04–10. Accepts any codec supported by the
+  local GDAL build (`LZW`, `DEFLATE`, `ZSTD`, `NONE`).
+- **`GEOTIFF_BLOCK_SIZE`** — configurable internal tile block dimension in pixels
+  (default `512`) for all tiled GeoTIFF outputs in steps 04–10. `512` is
+  standard for desktop GIS; `256` is preferred for Cloud-Optimized GeoTIFFs.
+- **`reproject_resolution()` in `hls_utils.py`** — CRS-unit-aware resolution
+  helper replacing all hardcoded `resolution=30` calls in steps 04, 05, 09, 10.
+  Returns metres unchanged for projected CRS; converts to approximate degrees
+  for geographic CRS and prints a `[WARN]`.
+
+### Fixed
+- Steps 04, 05, 09, and 10 produced a 1×1 pixel output with no valid data when
+  `TARGET_CRS` was set to a geographic CRS (e.g. `EPSG:4148`) because
+  `resolution=30` was interpreted as 30 degrees per pixel instead of 30 metres.
+
+---
+
 ## 2026-02-26
 
 ### Added

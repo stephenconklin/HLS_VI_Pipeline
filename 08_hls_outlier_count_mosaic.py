@@ -25,7 +25,9 @@ from hls_utils import filter_by_configured_tiles
 INPUT_FOLDER  = os.environ.get("REPROJECTED_DIR_OUTLIERS", "")
 MOSAIC_DIR    = os.environ.get("MOSAIC_DIR",               "")
 TARGET_CRS    = os.environ.get("TARGET_CRS",               "EPSG:6350")
-PROCESSED_VIS = os.environ.get("PROCESSED_VIS",           "NDVI EVI2 NIRv").split()
+PROCESSED_VIS      = os.environ.get("PROCESSED_VIS",           "NDVI EVI2 NIRv").split()
+GEOTIFF_COMPRESS   = os.environ.get("GEOTIFF_COMPRESS",        "LZW").upper()
+GEOTIFF_BLOCK_SIZE = int(os.environ.get("GEOTIFF_BLOCK_SIZE",  512))
 
 if not INPUT_FOLDER or not MOSAIC_DIR:
     raise ValueError("REPROJECTED_DIR_OUTLIERS or MOSAIC_DIR not set.")
@@ -73,10 +75,10 @@ def mosaic_outlier_count(vi_type):
             crs        = src_files[0].crs,
             transform  = transform,
             nodata     = 0,
-            compress   = 'LZW',
+            compress   = GEOTIFF_COMPRESS,
             tiled      = True,
-            blockxsize = 512,
-            blockysize = 512,
+            blockxsize = GEOTIFF_BLOCK_SIZE,
+            blockysize = GEOTIFF_BLOCK_SIZE,
             predictor  = 2,    # integer differencing — correct for uint16 count data
         )
 

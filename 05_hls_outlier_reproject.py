@@ -32,9 +32,11 @@ warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarni
 # --- CONFIGURATION FROM ENV ---
 INPUT_FOLDER  = os.environ.get("NETCDF_DIR",               "")
 OUTPUT_FOLDER = os.environ.get("REPROJECTED_DIR_OUTLIERS", "")
-TARGET_CRS    = os.environ.get("TARGET_CRS",               "EPSG:6350")
-PROCESSED_VIS = os.environ.get("PROCESSED_VIS",           "NDVI EVI2 NIRv").split()
-N_WORKERS     = int(os.environ.get("NUM_WORKERS",          4))
+TARGET_CRS         = os.environ.get("TARGET_CRS",               "EPSG:6350")
+PROCESSED_VIS      = os.environ.get("PROCESSED_VIS",           "NDVI EVI2 NIRv").split()
+N_WORKERS          = int(os.environ.get("NUM_WORKERS",          4))
+GEOTIFF_COMPRESS   = os.environ.get("GEOTIFF_COMPRESS",        "LZW").upper()
+GEOTIFF_BLOCK_SIZE = int(os.environ.get("GEOTIFF_BLOCK_SIZE",  512))
 
 if not INPUT_FOLDER or not OUTPUT_FOLDER:
     raise ValueError("NETCDF_DIR or REPROJECTED_DIR_OUTLIERS not set.")
@@ -101,7 +103,8 @@ def process_file(args):
         outlier_mean.rio.write_crs(source_crs, inplace=True)
         reproj_mean = outlier_mean.rio.reproject(TARGET_CRS, resolution=reproject_resolution(TARGET_CRS))
         reproj_mean.encoding.clear()
-        reproj_mean.rio.to_raster(mean_path, compress='LZW', tiled=True,
+        reproj_mean.rio.to_raster(mean_path, compress=GEOTIFF_COMPRESS, tiled=True,
+                                   blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
                                    dtype='float32', nodata=np.nan)
 
         # --- Outlier count ---
@@ -113,7 +116,9 @@ def process_file(args):
         reproj_count = reproj_count.fillna(0).astype('uint16')
         reproj_count.rio.write_nodata(0, encoded=True, inplace=True)
         reproj_count.encoding.clear()
-        reproj_count.rio.to_raster(count_path, compress='LZW', tiled=True, dtype='uint16')
+        reproj_count.rio.to_raster(count_path, compress=GEOTIFF_COMPRESS, tiled=True,
+                                    blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
+                                    dtype='uint16')
 
         ds.close()
         return f"OK: {vi_type} / {filename}"
