@@ -20,5 +20,4 @@ dependencies:
   - xarray>=2023.1,<2025  # xarray 2024.x removed set_options(scheduler=) — pin above that
   - rioxarray>=0.15,<1.0  # Connects xarray to rasterio for spatial reprojections
   - dask>=2023.1,<2026    # Enables memory-efficient chunking for large datasets
-  - geopandas>=0.14,<2.0  # GeoPackage writing and GeoDataFrame construction (step 10)
-  - shapely>=2.0,<3.0     # Point geometry construction for outlier export (step 10)
+  - fiona>=1.9,<2.0       # GeoPackage writing with streaming writes (step 11)

@@ -75,7 +75,7 @@ def _process_tile(args: dict) -> dict:
     tile_id  = filename.split('_')[0] if '_' in filename else filename.replace('.nc', '')
 
     try:
-        ds = xr.open_dataset(nc_path, chunks='auto')
+        ds = xr.open_dataset(nc_path, chunks={'time': 10})
 
         if vi_type in ds.data_vars:
             da = ds[vi_type]
@@ -192,21 +192,24 @@ def build_count_valid_mosaic(processed_vis: list):
 
             count_tile_paths = []
             n_skipped = n_errors = 0
+            n_total = len(worker_args)
+            n_done = 0
 
             with ProcessPoolExecutor(max_workers=N_WORKERS) as executor:
                 futures = {executor.submit(_process_tile, a): a
                            for a in worker_args}
                 for future in as_completed(futures):
+                    n_done += 1
                     result = future.result()
                     if result['status'] == 'ok':
                         count_tile_paths.append(result['count_path'])
-                        print(f"  ✓ {result['message']}")
+                        print(f"  [{n_done}/{n_total}] ✓ {result['message']}", flush=True)
                     elif result['status'] == 'skip':
                         n_skipped += 1
-                        print(f"  [skip] {result['message']}")
+                        print(f"  [{n_done}/{n_total}] skip  {result['message']}", flush=True)
                     else:
                         n_errors += 1
-                        print(f"  [error] {result['message']}")
+                        print(f"  [{n_done}/{n_total}] error {result['message']}", flush=True)
 
             if not count_tile_paths:
                 print(f"  [!] No tiles produced for {vi} — skipping mosaic.")

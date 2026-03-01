@@ -96,7 +96,7 @@ Add future shared helpers here rather than duplicating across scripts.
 
 **Tile enforcement**: `HLS_TILES` in `config.env` is enforced at every processing step. Steps 02–11 call `filter_by_configured_tiles()` immediately after each glob so only configured tiles are processed. Step 01 (download) uses `HLS_TILES` natively via CMR API queries.
 
-**Parallelism**: Step 02 uses `multiprocessing.Pool` with `mp.set_start_method('fork', force=True)`; steps 04, 05, 09, 10, and 11 use `ProcessPoolExecutor`. Worker functions must be defined at module top level (required for pickling). Workers set `dask.config.set(scheduler='synchronous')` internally to prevent nested thread pools.
+**Parallelism**: Step 02 uses `multiprocessing.Pool` with `mp.set_start_method('fork', force=True)`; steps 04, 05, 09, and 10 use `ProcessPoolExecutor`. Worker functions must be defined at module top level (required for pickling). Workers set `dask.config.set(scheduler='synchronous')` internally to prevent nested thread pools. Step 11 processes tiles sequentially (no parallel executor) using a time-chunked generator.
 
 **Chunked spatial processing**: Steps 04, 05, 09, and 10 use xarray + dask (`CHUNK_SIZE` tiles) to avoid loading full rasters into memory. `xr.open_dataset(nc_path, chunks='auto')` for lazy loading; `.compute()` inside worker processes.
 
@@ -112,13 +112,15 @@ Add future shared helpers here rather than duplicating across scripts.
 
 All `np.errstate(divide='ignore', invalid='ignore')` is used to suppress divide-by-zero warnings; inf/nan values are carried through and filtered downstream by valid-range logic.
 
-**Worker error handling**: Workers never raise to the main process. Steps 02, 04, 05, and 11 return status strings (e.g., `"OK: ..."`, `"Skipped (Exists): ..."`, `"ERROR: ..."`); the main loop checks the returned string prefix. Steps 09 and 10 return dicts (`{'status': 'ok'|'skip'|'error', 'message': ..., ...}`); the main loop checks `result['status']`. In both patterns, if an output file already exists the worker returns a skip result and does no computation.
+**Worker error handling**: Workers never raise to the main process. Steps 02, 04, and 05 return status strings (e.g., `"OK: ..."`, `"Skipped (Exists): ..."`, `"ERROR: ..."`); the main loop checks the returned string prefix. Steps 09 and 10 return dicts (`{'status': 'ok'|'skip'|'error', 'message': ..., ...}`); the main loop checks `result['status']`. In both patterns, if an output file already exists the worker returns a skip result and does no computation. Step 11 has no worker — `iter_tile_chunks` is a generator that yields fiona feature dicts per time-chunk; the main loop streams writes directly to fiona and catches exceptions per tile with `try/except`.
 
 **Outlier handling**: "Outliers" are valid (unmasked) pixels outside per-VI min/max bounds (`np.isfinite(data) & ((data < vmin) | (data > vmax))`). Steps 05/07/08 produce raster summaries (mean + count); step 11 produces a point vector record for every individual outlier pixel-date observation, with coordinates reprojected to WGS84 (EPSG:4326) via `pyproj.Transformer`.
 
 **Temporal storage**: NetCDF files store dates as integer "days since 1970-01-01". Step 10 parses named time windows from `TIMESLICE_WINDOWS` to produce per-window multi-band mosaics with window labels stored in band descriptions.
 
 **Streaming mosaics** (steps 06, 07, 08, 09): Use `rasterio.merge.merge()` for memory-efficient tiling — peak RAM is one tile + output buffer, not all tiles simultaneously.
+
+**Streaming GeoPackage writes** (step 11): `iter_tile_chunks` loads `TIME_CHUNK` (10) time slices at a time from the NetCDF, yields fiona feature dicts for any outliers found, and frees the chunk immediately. The main loop writes each batch directly to the open fiona dataset — no cross-tile accumulation in memory. Uses `fiona` directly (not `geopandas`/`shapely`) to avoid loading all features into a GeoDataFrame before writing.
 
 **Band requirements**: `hls_pipeline.sh` contains a pre-flight validation block that checks that all bands needed for each requested VI are present in the L30 and S30 band lists before executing any step.
 

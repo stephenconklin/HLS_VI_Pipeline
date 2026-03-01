@@ -15,23 +15,26 @@
 # Feature attributes: tile_id, vi_type, sensor, date, vi_value
 # Geometry: Point (WGS84 / EPSG:4326), one point per pixel centroid
 #
-# Uses ProcessPoolExecutor — each worker handles one (nc_file, vi_type)
-# pair and returns the extracted records to the main process for writing.
+# Memory-efficient design:
+#   - Sequential tile processing — only one tile's data in RAM at a time
+#   - Time-axis chunked loading (TIME_CHUNK slices per iteration) — avoids
+#     loading the full 3-D array into memory at once
+#   - Streaming fiona writes — each chunk is written and freed immediately,
+#     no cross-tile accumulation in the main process
 #
 # Author:  Stephen Conklin <stephenconklin@gmail.com>
 #          https://github.com/stephenconklin
 # License: MIT
 
 import os
+import gc
 import glob
 import warnings
+import fiona
 import numpy as np
 import pandas as pd
 import netCDF4 as nc4
-import geopandas as gpd
-from shapely.geometry import Point
 from pyproj import Transformer
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from hls_utils import filter_by_configured_tiles, get_valid_range
 
 warnings.filterwarnings("ignore")
@@ -40,12 +43,21 @@ warnings.filterwarnings("ignore")
 INPUT_FOLDER  = os.environ.get("NETCDF_DIR",        "")
 OUTPUT_FOLDER = os.environ.get("OUTLIER_GPKG_DIR",  "")
 PROCESSED_VIS = os.environ.get("PROCESSED_VIS",     "NDVI EVI2 NIRv").split()
-N_WORKERS     = int(os.environ.get("NUM_WORKERS",    4))
 
-if not INPUT_FOLDER or not OUTPUT_FOLDER:
-    raise ValueError("NETCDF_DIR or OUTLIER_GPKG_DIR not set.")
+# Number of time slices loaded per iteration — lower values use less memory.
+# 10 is a safe default for large tiles; raise to 20–50 if RAM allows.
+TIME_CHUNK = 10
 
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+GPKG_SCHEMA = {
+    "geometry": "Point",
+    "properties": {
+        "tile_id":  "str",
+        "vi_type":  "str",
+        "sensor":   "str",
+        "date":     "date",
+        "vi_value": "float",
+    },
+}
 
 EPOCH = pd.Timestamp("1970-01-01")
 
@@ -57,100 +69,110 @@ def _decode_sensor(s) -> str:
     return str(s).strip()
 
 
-def extract_outliers(args: tuple):
+def iter_tile_chunks(nc_path, vi_type, vmin, vmax):
     """
-    Worker: open one NetCDF file, find all outlier pixel-date observations
-    for the requested VI, and return a dict of columnar arrays.
+    Generator: open one NetCDF tile, load VI data TIME_CHUNK slices at a
+    time, and yield a list of fiona feature dicts for each chunk that
+    contains outliers.
+
+    Keeps only one time-chunk in memory at a time. The NetCDF dataset stays
+    open across yields and is closed when the generator is exhausted or
+    garbage-collected.
 
     Parameters
     ----------
-    args : (nc_path, vi_type)
+    nc_path       : str   — path to the NetCDF file
+    vi_type       : str   — VI variable name (e.g. "NDVI")
+    vmin, vmax    : float — outlier bounds (values outside → outlier)
 
-    Returns
-    -------
-    On success : (dict_of_columns, n_outliers, filename)
-    On skip    : "SKIP: ..." string
-    On error   : "ERROR: ..." string
+    Yields
+    ------
+    list[dict] — fiona feature dicts for one chunk of outliers
     """
-    nc_path, vi_type = args
-    try:
-        filename = os.path.basename(nc_path)
-        # Tile ID is the first segment of the filename (e.g. "T18TVL_NDVI.nc" → "T18TVL")
-        tile_id = filename.split("_")[0]
+    filename = os.path.basename(nc_path)
+    tile_id  = filename.split("_")[0]
 
-        vmin, vmax = get_valid_range(vi_type)
+    with nc4.Dataset(nc_path, "r") as ds:
+        if vi_type not in ds.variables:
+            return  # VI absent — caller sees empty iteration
 
-        with nc4.Dataset(nc_path, "r") as ds:
-            if vi_type not in ds.variables:
-                return f"SKIP: {vi_type} not in {filename}"
-
-            # Read coordinate and metadata arrays
-            time_vals   = ds.variables["time"][:]    # int32 days since 1970-01-01, shape (T,)
-            x_vals      = ds.variables["x"][:]       # native CRS metres, shape (W,)
-            y_vals      = ds.variables["y"][:]       # native CRS metres, shape (H,)
-            sensor_vals = ds.variables["sensor"][:]  # S3, shape (T,)
-
-            # Read VI data; netCDF4 returns a masked array — fill with NaN
-            raw = ds.variables[vi_type][:]
-            data = raw.filled(np.nan) if hasattr(raw, "filled") else np.array(raw, dtype=float)
-
-            # Detect CRS (WKT string) from the two locations step 03 writes it
-            crs_wkt = None
-            if "crs" in ds.ncattrs():
-                crs_wkt = ds.getncattr("crs")
-            if not crs_wkt and "spatial_ref" in ds.variables:
-                crs_wkt = ds.variables["spatial_ref"].getncattr("spatial_ref")
-
+        # CRS detection — same two locations step 03 writes it
+        crs_wkt = None
+        if "crs" in ds.ncattrs():
+            crs_wkt = ds.getncattr("crs")
+        if not crs_wkt and "spatial_ref" in ds.variables:
+            crs_wkt = ds.variables["spatial_ref"].getncattr("spatial_ref")
         if not crs_wkt:
-            return f"WARN: No CRS found in {filename}. Skipping."
+            print(f"  WARN: No CRS found in {filename}. Skipping.")
+            return
 
-        # --- Identify outliers ---
-        # A pixel is an outlier if it has a finite value AND is outside [vmin, vmax]
-        outlier_mask = np.isfinite(data) & ((data < vmin) | (data > vmax))
-        n_out = int(outlier_mask.sum())
-        if n_out == 0:
-            return f"SKIP (no outliers): {filename}"
+        time_vals   = ds.variables["time"][:]    # int32 days since 1970-01-01, shape (T,)
+        x_vals      = ds.variables["x"][:]       # native CRS metres, shape (W,)
+        y_vals      = ds.variables["y"][:]       # native CRS metres, shape (H,)
+        sensor_vals = ds.variables["sensor"][:]  # S3, shape (T,)
+        n_times     = len(time_vals)
 
-        # Flat indices → (time, y, x) index triplets
-        t_idx, y_idx, x_idx = np.where(outlier_mask)
-
-        # Native pixel-centre coordinates for each outlier
-        native_x = x_vals[x_idx]
-        native_y = y_vals[y_idx]
-
-        # Reproject from native tile CRS → WGS84 (lon, lat)
-        # always_xy=True: input is (easting, northing) → output is (lon, lat)
         transformer = Transformer.from_crs(crs_wkt, "EPSG:4326", always_xy=True)
-        lon, lat = transformer.transform(native_x, native_y)
 
-        # Convert integer time values to Python date objects
-        dates = [
-            (EPOCH + pd.Timedelta(days=int(t))).date()
-            for t in time_vals[t_idx]
-        ]
+        for t_start in range(0, n_times, TIME_CHUNK):
+            t_end = min(t_start + TIME_CHUNK, n_times)
 
-        # Decode fixed-length byte strings from the sensor variable
-        sensors = [_decode_sensor(sensor_vals[i]) for i in t_idx]
+            # Load one chunk of the VI variable — shape (chunk, H, W)
+            raw_chunk  = ds.variables[vi_type][t_start:t_end, :, :]
+            data_chunk = (
+                raw_chunk.filled(np.nan) if hasattr(raw_chunk, "filled")
+                else np.array(raw_chunk, dtype=float)
+            )
+            del raw_chunk
 
-        records = {
-            "tile_id":  [tile_id]  * n_out,
-            "vi_type":  [vi_type]  * n_out,
-            "sensor":   sensors,
-            "date":     dates,
-            "vi_value": data[t_idx, y_idx, x_idx].tolist(),
-            "lon":      lon.tolist(),
-            "lat":      lat.tolist(),
-        }
+            # Outlier: finite value outside [vmin, vmax]
+            outlier_mask = (
+                np.isfinite(data_chunk) & ((data_chunk < vmin) | (data_chunk > vmax))
+            )
+            if not outlier_mask.any():
+                del data_chunk, outlier_mask
+                gc.collect()
+                continue
 
-        return records, n_out, filename
+            ct_idx, y_idx, x_idx = np.where(outlier_mask)
+            t_global = ct_idx + t_start   # chunk-local → global time index
 
-    except Exception as e:
-        return f"ERROR ({os.path.basename(nc_path)}): {e}"
+            native_x = x_vals[x_idx]
+            native_y = y_vals[y_idx]
+            lon, lat = transformer.transform(native_x, native_y)
+
+            features = []
+            for i in range(len(ct_idx)):
+                date_str = str(
+                    (EPOCH + pd.Timedelta(days=int(time_vals[t_global[i]]))).date()
+                )
+                features.append({
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": (float(lon[i]), float(lat[i])),
+                    },
+                    "properties": {
+                        "tile_id":  tile_id,
+                        "vi_type":  vi_type,
+                        "sensor":   _decode_sensor(sensor_vals[t_global[i]]),
+                        "date":     date_str,
+                        "vi_value": float(data_chunk[ct_idx[i], y_idx[i], x_idx[i]]),
+                    },
+                })
+
+            yield features
+
+            del data_chunk, outlier_mask, features, lon, lat
+            gc.collect()
 
 
 def main():
-    print(f"--- Step 11: Outlier GeoPackage Export ---")
-    print(f"VIs: {PROCESSED_VIS}  |  Workers: {N_WORKERS}")
+    if not INPUT_FOLDER or not OUTPUT_FOLDER:
+        raise ValueError("NETCDF_DIR or OUTLIER_GPKG_DIR not set.")
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    print("--- Step 11: Outlier GeoPackage Export ---")
+    print(f"VIs: {PROCESSED_VIS}  |  Time chunk: {TIME_CHUNK} slices")
     for vi in PROCESSED_VIS:
         vmin, vmax = get_valid_range(vi)
         print(f"  Outlier threshold  {vi}: < {vmin} or > {vmax}")
@@ -162,65 +184,58 @@ def main():
         return
 
     for vi_type in PROCESSED_VIS:
+        vmin, vmax = get_valid_range(vi_type)
         work_items = [
-            (nc_path, vi_type)
-            for nc_path in all_nc
+            nc_path for nc_path in all_nc
             if vi_type in os.path.basename(nc_path)
         ]
         if not work_items:
             print(f"\n  No NetCDF files matched for {vi_type}. Skipping.")
             continue
 
+        out_path = os.path.join(OUTPUT_FOLDER, f"HLS_outliers_{vi_type}.gpkg")
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
         print(f"\nProcessing {vi_type}: {len(work_items)} file(s)")
 
-        all_records = []
         total_outliers = 0
-        completed, total = 0, len(work_items)
+        n_tiles = len(work_items)
 
-        with ProcessPoolExecutor(max_workers=N_WORKERS) as executor:
-            futures = {executor.submit(extract_outliers, item): item for item in work_items}
-            for future in as_completed(futures):
-                completed += 1
-                result = future.result()
+        # Open one GPKG file for the whole VI; each tile's chunks stream into it.
+        with fiona.open(
+            out_path, "w", driver="GPKG", schema=GPKG_SCHEMA, crs="EPSG:4326"
+        ) as dst:
+            for tile_idx, nc_path in enumerate(work_items, 1):
+                filename   = os.path.basename(nc_path)
+                n_tile_out = 0
 
-                if isinstance(result, str):
-                    # Skip or error message
-                    if not result.startswith("SKIP"):
-                        print(f"  [{completed}/{total}] {result}")
-                    elif completed % 10 == 0 or completed == total:
-                        print(f"  [{completed}/{total}] {result}")
+                print(f"  [{tile_idx}/{n_tiles}] {filename}", flush=True)
+
+                try:
+                    for chunk_features in iter_tile_chunks(nc_path, vi_type, vmin, vmax):
+                        dst.writerecords(chunk_features)
+                        n_tile_out += len(chunk_features)
+                except Exception as e:
+                    print(f"    ERROR: {e}", flush=True)
+                    continue
+
+                total_outliers += n_tile_out
+                if n_tile_out > 0:
+                    print(
+                        f"    OK: {n_tile_out:,} outliers"
+                        f"  (running total: {total_outliers:,})",
+                        flush=True,
+                    )
                 else:
-                    records, n_out, fname = result
-                    all_records.append(records)
-                    total_outliers += n_out
-                    if completed % 5 == 0 or completed == total:
-                        print(f"  [{completed}/{total}] OK: {n_out:,} outliers in {fname}")
+                    print(f"    no outliers", flush=True)
 
-        if not all_records:
+        if total_outliers > 0:
+            print(f"  Wrote: {out_path}  ({total_outliers:,} features)")
+        else:
             print(f"  No outliers found for {vi_type}.")
-            continue
-
-        print(f"  Building GeoDataFrame ({total_outliers:,} total features)...")
-
-        # Concatenate columnar records from all tiles into a single dict
-        combined: dict = {k: [] for k in all_records[0]}
-        for rec in all_records:
-            for k, v in rec.items():
-                combined[k].extend(v)
-
-        df = pd.DataFrame(combined)
-        df["date"] = pd.to_datetime(df["date"])
-
-        geometry = [Point(lon, lat) for lon, lat in zip(df["lon"], df["lat"])]
-        gdf = gpd.GeoDataFrame(
-            df.drop(columns=["lon", "lat"]),
-            geometry=geometry,
-            crs="EPSG:4326",
-        )
-
-        out_path = os.path.join(OUTPUT_FOLDER, f"HLS_outliers_{vi_type}.gpkg")
-        gdf.to_file(out_path, driver="GPKG")
-        print(f"  Wrote: {out_path}  ({len(gdf):,} features)")
+            if os.path.exists(out_path):
+                os.remove(out_path)
 
     print("\nStep 11 complete.")
 
