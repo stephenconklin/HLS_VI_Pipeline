@@ -28,5 +28,8 @@ HLS_VI_Pipeline.code-workspace
 *.tiff
 *.gpkg
 
+# Local configuration overrides (user-specific, not for version control)
+config.local.env
+
 # Runtime artifacts
 tiles_active_run.txt

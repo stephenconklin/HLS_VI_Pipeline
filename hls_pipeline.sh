@@ -60,6 +60,11 @@ else
     exit 1
 fi
 
+if [ -f config.local.env ]; then
+    set -a; source config.local.env; set +a
+    echo "Local overrides loaded from config.local.env"
+fi
+
 # -----------------------------------------------------------------
 # 2. VALIDATE BAND REQUIREMENTS VS PROCESSED_VIS
 # -----------------------------------------------------------------
