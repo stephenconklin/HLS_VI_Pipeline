@@ -25,36 +25,36 @@ Full documentation — prerequisites, configuration reference, step-by-step guid
     <td width="50%" align="center" valign="top">
       <img src="docs/images/PA_NDVI_MEAN-1280.jpg" alt="Image 1" width="100%">
       <br>
-      <small><i>NDVI "leaf-off" temporal mean mosaic, 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Viridis)</i></small>
+      <sub><i>NDVI "leaf-off" temporal mean mosaic, 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Viridis)</i></sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/images/BioSCape_NDVI_MEAN-1280.jpg" alt="Image 3" width="100%">
       <br>
-      <small><i>NDVI temporal mean mosaic, 2015-2025, South Africa (EPSG:9221, Color Ramp:Viridis)</i></small>
+      <sub><i>NDVI temporal mean mosaic, 2015-2025, South Africa (EPSG:9221, Color Ramp:Viridis)</i></sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <img src="docs/images/PA_Count_Valid-1280.jpg" alt="Image 2" width="100%">
       <br>
-      <small><i>Valid NDVI pixel observations, "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Rocket [Darker=fewer valid observations, Lighter=more valid observations])</i></small>
+      <sub><i>Valid NDVI pixel observations, "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Rocket [Darker=fewer valid observations, Lighter=more valid observations])</i></sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/images/BioSCape_Count_Valid-1280.jpg" alt="Image 4" width="100%">
       <br>
-      <small><i>Valid NDVI pixel observations, 2015-2025, South Africa (EPSG:9221, Color Ramp:Rocket [Darker=fewer valid observations, Lighter=more valid observations])</i></small>
+      <sub><i>Valid NDVI pixel observations, 2015-2025, South Africa (EPSG:9221, Color Ramp:Rocket [Darker=fewer valid observations, Lighter=more valid observations])</i></sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <img src="docs/images/PA_Outlier_Gpkg-1280.jpg" alt="Image 5" width="100%">
       <br>
-      <small><i>NDVI outlier vector points (.gpkg), "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350)</i></small>
+      <sub><i>NDVI outlier vector points (.gpkg), "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350)</i></sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="docs/images/BioSCape_Outlier_Gpkg-1280.jpg" alt="Image 6" width="100%">
       <br>
-      <small><i>NDVI outlier vector points (.gpkg), 2015-2025, South Africa (EPSG:9221)</i></small>
+      <sub><i>NDVI outlier vector points (.gpkg), 2015-2025, South Africa (EPSG:9221)</i></sub>
     </td>
   </tr>
 </table>
