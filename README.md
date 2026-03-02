@@ -17,43 +17,50 @@ Full documentation — prerequisites, configuration reference, step-by-step guid
 **[https://hls-vi-pipeline.readthedocs.io/en/latest/overview.html](https://hls-vi-pipeline.readthedocs.io/en/latest/overview.html)**
 
 ---
-<!--
-<div style="display: flex; flex-wrap: wrap; gap: 10px; text-align: center;">
 
-  <div style="flex: 1 1 45%;">
-    <img src="https://via.placeholder.com/300x200" alt="Image 1" style="max-width: 100%;">
-    <p><i>Caption for Image 1</i></p>
-  </div>
+## Example Outputs
 
-  <div style="flex: 1 1 45%;">
-    <img src="https://via.placeholder.com/300x200" alt="Image 2" style="max-width: 100%;">
-    <p><i>Caption for Image 2</i></p>
-  </div>
-
-  <div style="flex: 1 1 45%;">
-    <img src="https://via.placeholder.com/300x200" alt="Image 3" style="max-width: 100%;">
-    <p><i>Caption for Image 3</i></p>
-  </div>
-
-  <div style="flex: 1 1 45%;">
-    <img src="https://via.placeholder.com/300x200" alt="Image 4" style="max-width: 100%;">
-    <p><i>Caption for Image 4</i></p>
-  </div>
-
-  <div style="flex: 1 1 45%;">
-    <img src="https://via.placeholder.com/300x200" alt="Image 5" style="max-width: 100%;">
-    <p><i>Caption for Image 5</i></p>
-  </div>
-
-  <div style="flex: 1 1 45%;">
-    <img src="https://via.placeholder.com/300x200" alt="Image 6" style="max-width: 100%;">
-    <p><i>Caption for Image 6</i></p>
-  </div>
-
-</div>
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/PA_NDVI_MEAN-800.jpg" alt="Image 1" width="100%">
+      <br>
+      <i>NDVI "leaf-off" temporal mean mosaic, 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Viridis)</i>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/BioSCape_NDVI_MEAN-800.jpg" alt="Image 3" width="100%">
+      <br>
+      <i>NDVI temporal mean mosaic, 2015-2025, South Africa (EPSG:9221, Color Ramp:Viridis)</i>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/PA_Count_Valid-800.jpg" alt="Image 2" width="100%">
+      <br>
+      <i>Valid NDVI pixel observations, "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Rocket)</i>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/BioSCape_Count_Valid-800.jpg" alt="Image 4" width="100%">
+      <br>
+      <i>Valid NDVI pixel observations, 2015-2025, South Africa (EPSG:9221, Color Ramp:Rocket)</i>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/PA_Outlier_Gpkg-800.jpg" alt="Image 5" width="100%">
+      <br>
+      <i>NDVI outlier vector points (gpkg), "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350)</i>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/BioSCape_Outlier_Gpkg-800.jpg" alt="Image 6" width="100%">
+      <br>
+      <i>NDVI outlier vector points (.gpkg), 2015-2025, South Africa (EPSG:9221)</i>
+    </td>
+  </tr>
+</table>
 
 ---
-
+<!--
 ============================================================
      YOUTUBE VIDEO — replace YOUR_VIDEO_ID with your video ID
      Example ID: dQw4w9WgXcQ  (from youtube.com/watch?v=dQw4w9WgXcQ)
