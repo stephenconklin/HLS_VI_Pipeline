@@ -37,12 +37,12 @@ Full documentation — prerequisites, configuration reference, step-by-step guid
     <td width="50%" align="center">
       <img src="docs/images/PA_Count_Valid-1280.jpg" alt="Image 2" width="100%">
       <br>
-      <i>Valid NDVI pixel observations, "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Rocket)</i>
+      <i>Valid NDVI pixel observations, "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Rocket [Darker=fewer valid observations, Lighter=more valid observations])</i>
     </td>
     <td width="50%" align="center">
       <img src="docs/images/BioSCape_Count_Valid-1280.jpg" alt="Image 4" width="100%">
       <br>
-      <i>Valid NDVI pixel observations, 2015-2025, South Africa (EPSG:9221, Color Ramp:Rocket)</i>
+      <i>Valid NDVI pixel observations, 2015-2025, South Africa (EPSG:9221, Color Ramp:Rocket [Darker=fewer valid observations, Lighter=more valid observations])</i>
     </td>
   </tr>
   <tr>
