@@ -23,36 +23,36 @@ Full documentation — prerequisites, configuration reference, step-by-step guid
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="docs/images/PA_NDVI_MEAN-800.jpg" alt="Image 1" width="100%">
+      <img src="docs/images/PA_NDVI_MEAN-1280.jpg" alt="Image 1" width="100%">
       <br>
       <i>NDVI "leaf-off" temporal mean mosaic, 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Viridis)</i>
     </td>
     <td width="50%" align="center">
-      <img src="docs/images/BioSCape_NDVI_MEAN-800.jpg" alt="Image 3" width="100%">
+      <img src="docs/images/BioSCape_NDVI_MEAN-1280.jpg" alt="Image 3" width="100%">
       <br>
       <i>NDVI temporal mean mosaic, 2015-2025, South Africa (EPSG:9221, Color Ramp:Viridis)</i>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="docs/images/PA_Count_Valid-800.jpg" alt="Image 2" width="100%">
+      <img src="docs/images/PA_Count_Valid-1280.jpg" alt="Image 2" width="100%">
       <br>
       <i>Valid NDVI pixel observations, "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350, Color Ramp:Rocket)</i>
     </td>
     <td width="50%" align="center">
-      <img src="docs/images/BioSCape_Count_Valid-800.jpg" alt="Image 4" width="100%">
+      <img src="docs/images/BioSCape_Count_Valid-1280.jpg" alt="Image 4" width="100%">
       <br>
       <i>Valid NDVI pixel observations, 2015-2025, South Africa (EPSG:9221, Color Ramp:Rocket)</i>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="docs/images/PA_Outlier_Gpkg-800.jpg" alt="Image 5" width="100%">
+      <img src="docs/images/PA_Outlier_Gpkg-1280.jpg" alt="Image 5" width="100%">
       <br>
       <i>NDVI outlier vector points (.gpkg), "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350)</i>
     </td>
     <td width="50%" align="center">
-      <img src="docs/images/BioSCape_Outlier_Gpkg-800.jpg" alt="Image 6" width="100%">
+      <img src="docs/images/BioSCape_Outlier_Gpkg-1280.jpg" alt="Image 6" width="100%">
       <br>
       <i>NDVI outlier vector points (.gpkg), 2015-2025, South Africa (EPSG:9221)</i>
     </td>
