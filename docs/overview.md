@@ -226,7 +226,7 @@ conda activate hls_pipeline
 ### 3. Verify the Installation
 
 ```bash
-python -c "import rasterio, xarray, rioxarray, geopandas; print('Environment OK')"
+python -c "import numpy, pandas, rasterio, netCDF4, xarray, rioxarray, dask, fiona; print('Environment OK')"
 ```
 
 ---
