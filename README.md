@@ -49,7 +49,7 @@ Full documentation — prerequisites, configuration reference, step-by-step guid
     <td width="50%" align="center">
       <img src="docs/images/PA_Outlier_Gpkg-800.jpg" alt="Image 5" width="100%">
       <br>
-      <i>NDVI outlier vector points (gpkg), "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350)</i>
+      <i>NDVI outlier vector points (.gpkg), "leaf-off," 2015-2021, Pennsylvania, USA (EPSG:6350)</i>
     </td>
     <td width="50%" align="center">
       <img src="docs/images/BioSCape_Outlier_Gpkg-800.jpg" alt="Image 6" width="100%">
