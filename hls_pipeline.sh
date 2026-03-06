@@ -30,17 +30,17 @@
 #     outliers        Steps 05+07+08+11 (full outlier chain)
 #
 # Script-to-step mapping:
-#   download       → 01_hls_download_query.sh
-#   vi_calc        → 02_hls_vi_calc.py
-#   netcdf         → 03_hls_netcdf_build.py
-#   mean_flat      → 04_hls_mean_reproject.py
-#   outlier_flat   → 05_hls_outlier_reproject.py
-#   mean_mosaic    → 06_hls_mean_mosaic.py
-#   outlier_mosaic → 07_hls_outlier_mean_mosaic.py
-#   outlier_counts → 08_hls_outlier_count_mosaic.py
-#   count_valid_mosaic → 09_hls_count_valid_mosaic.py
-#   timeseries       → 10_hls_timeseries_mosaic.py
-#   outlier_gpkg     → 11_hls_outlier_gpkg.py
+#   download       → src/01_hls_download_query.sh
+#   vi_calc        → src/02_hls_vi_calc.py
+#   netcdf         → src/03_hls_netcdf_build.py
+#   mean_flat      → src/04_hls_mean_reproject.py
+#   outlier_flat   → src/05_hls_outlier_reproject.py
+#   mean_mosaic    → src/06_hls_mean_mosaic.py
+#   outlier_mosaic → src/07_hls_outlier_mean_mosaic.py
+#   outlier_counts → src/08_hls_outlier_count_mosaic.py
+#   count_valid_mosaic → src/09_hls_count_valid_mosaic.py
+#   timeseries       → src/10_hls_timeseries_mosaic.py
+#   outlier_gpkg     → src/11_hls_outlier_gpkg.py
 #
 # Author:  Stephen Conklin <stephenconklin@gmail.com>
 #          https://github.com/stephenconklin
@@ -255,7 +255,7 @@ echo "================================================================="
             tbt_end=$(echo $range | cut -d'|' -f2)
             echo -n "    Scanning $tbt_start to $tbt_end... " | tee -a "$LOGFILE"
             export HLS_MODE="estimate"
-            tbt_count=$(./01_hls_download_query.sh "$TEMP_EST_TILE_FILE" "$tbt_start" "$tbt_end" "$RAW_HLS_DIR")
+            tbt_count=$(./src/01_hls_download_query.sh "$TEMP_EST_TILE_FILE" "$tbt_start" "$tbt_end" "$RAW_HLS_DIR")
             echo "$tbt_count granules." | tee -a "$LOGFILE"
             TBT_TOTAL_GRANULES=$((TBT_TOTAL_GRANULES + tbt_count))
         done
@@ -463,7 +463,7 @@ echo "================================================================="
                 tbt_start=$(echo $range | cut -d'|' -f1)
                 tbt_end=$(echo $range | cut -d'|' -f2)
                 export HLS_MODE="batch"
-                ./01_hls_download_query.sh "$TBT_SINGLE_TILE_FILE" "$tbt_start" "$tbt_end" "$RAW_HLS_DIR" 2>&1 | tee -a "$LOGFILE"
+                ./src/01_hls_download_query.sh "$TBT_SINGLE_TILE_FILE" "$tbt_start" "$tbt_end" "$RAW_HLS_DIR" 2>&1 | tee -a "$LOGFILE"
                 if [ ${PIPESTATUS[0]} -ne 0 ]; then
                     echo "[ERROR][Step 01] Tile $tbt_tile failed on cycle $tbt_start. Skipping tile." | tee -a "$LOGFILE"
                     TBT_DL_OK=false
@@ -477,7 +477,7 @@ echo "================================================================="
         # --- Step 02: VI calc for this tile ---
         if step_active "vi_calc" && [ "$TBT_TILE_OK" = "true" ]; then
             echo "[Step 02 | $tbt_tile] Calculating VIs: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-            "$PYTHON_EXEC" 02_hls_vi_calc.py 2>&1 | tee -a "$LOGFILE"
+            "$PYTHON_EXEC" src/02_hls_vi_calc.py 2>&1 | tee -a "$LOGFILE"
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
                 echo "[ERROR][Step 02] Tile $tbt_tile failed. Skipping tile." | tee -a "$LOGFILE"
                 TBT_TILE_OK=false
@@ -487,7 +487,7 @@ echo "================================================================="
         # --- Step 03: NetCDF for this tile ---
         if step_active "netcdf" && [ "$TBT_TILE_OK" = "true" ]; then
             echo "[Step 03 | $tbt_tile] Building NetCDF..." | tee -a "$LOGFILE"
-            "$PYTHON_EXEC" 03_hls_netcdf_build.py 2>&1 | tee -a "$LOGFILE"
+            "$PYTHON_EXEC" src/03_hls_netcdf_build.py 2>&1 | tee -a "$LOGFILE"
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
                 echo "[ERROR][Step 03] Tile $tbt_tile failed. Skipping tile." | tee -a "$LOGFILE"
                 TBT_TILE_OK=false
@@ -537,7 +537,7 @@ echo "================================================================="
 if step_active "mean_flat"; then
     echo "" | tee -a "$LOGFILE"
     echo "[Step 04 | mean_flat] Computing temporal means for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 04_hls_mean_reproject.py 2>&1 | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" src/04_hls_mean_reproject.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 04] Complete." | tee -a "$LOGFILE"
 fi
 
@@ -547,7 +547,7 @@ fi
 if step_active "outlier_flat"; then
     echo "" | tee -a "$LOGFILE"
     echo "[Step 05 | outlier_flat] Extracting outliers for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 05_hls_outlier_reproject.py 2>&1 | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" src/05_hls_outlier_reproject.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 05] Complete." | tee -a "$LOGFILE"
 fi
 
@@ -557,7 +557,7 @@ fi
 if step_active "mean_mosaic"; then
     echo "" | tee -a "$LOGFILE"
     echo "[Step 06 | mean_mosaic] Mosaicking mean tiles for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 06_hls_mean_mosaic.py 2>&1 | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" src/06_hls_mean_mosaic.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 06] Complete." | tee -a "$LOGFILE"
 fi
 
@@ -567,7 +567,7 @@ fi
 if step_active "outlier_mosaic"; then
     echo "" | tee -a "$LOGFILE"
     echo "[Step 07 | outlier_mosaic] Mosaicking outlier mean tiles..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 07_hls_outlier_mean_mosaic.py 2>&1 | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" src/07_hls_outlier_mean_mosaic.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 07] Complete." | tee -a "$LOGFILE"
 fi
 
@@ -577,7 +577,7 @@ fi
 if step_active "outlier_counts"; then
     echo "" | tee -a "$LOGFILE"
     echo "[Step 08 | outlier_counts] Mosaicking outlier count tiles..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 08_hls_outlier_count_mosaic.py 2>&1 | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" src/08_hls_outlier_count_mosaic.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 08] Complete." | tee -a "$LOGFILE"
 fi
 
@@ -587,7 +587,7 @@ fi
 if step_active "count_valid_mosaic"; then
     echo "" | tee -a "$LOGFILE"
     echo "[Step 09 | count_valid_mosaic] Building CountValid mosaic for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 09_hls_count_valid_mosaic.py 2>&1 | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" src/09_hls_count_valid_mosaic.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 09] Complete." | tee -a "$LOGFILE"
 fi
 
@@ -599,7 +599,7 @@ if step_active "timeseries"; then
         echo "" | tee -a "$LOGFILE"
         echo "[Step 10 | timeseries] Building time-series stacks for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
         echo "[Step 10] Windows: ${TIMESLICE_WINDOWS}" | tee -a "$LOGFILE"
-        "$PYTHON_EXEC" 10_hls_timeseries_mosaic.py 2>&1 | tee -a "$LOGFILE"
+        "$PYTHON_EXEC" src/10_hls_timeseries_mosaic.py 2>&1 | tee -a "$LOGFILE"
         echo "[Step 10] Complete." | tee -a "$LOGFILE"
     else
         echo "" | tee -a "$LOGFILE"
@@ -613,7 +613,7 @@ fi
 if step_active "outlier_gpkg"; then
     echo "" | tee -a "$LOGFILE"
     echo "[Step 11 | outlier_gpkg] Exporting outlier points to GeoPackage for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-    "$PYTHON_EXEC" 11_hls_outlier_gpkg.py 2>&1 | tee -a "$LOGFILE"
+    "$PYTHON_EXEC" src/11_hls_outlier_gpkg.py 2>&1 | tee -a "$LOGFILE"
     echo "[Step 11] Complete." | tee -a "$LOGFILE"
 fi
 

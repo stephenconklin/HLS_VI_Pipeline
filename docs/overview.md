@@ -77,21 +77,21 @@ NASA CMR API
      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Step 01 · download                                                 │
-│  01_hls_download_query.sh                                           │
+│  src/01_hls_download_query.sh                                       │
 │  Query CMR API, estimate storage, download raw L30/S30 bands        │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │  Raw GeoTIFF bands (B04, B05/B8A, Fmask)
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Step 02 · vi_calc                                                  │
-│  02_hls_vi_calc.py                                                  │
+│  src/02_hls_vi_calc.py                                              │
 │  Apply Fmask quality masking; compute NDVI / EVI2 / NIRv            │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │  Per-granule VI GeoTIFFs
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Step 03 · netcdf                                                   │
-│  03_hls_netcdf_build.py                                             │
+│  src/03_hls_netcdf_build.py                                         │
 │  Aggregate GeoTIFFs → CF-1.8 NetCDF time-series per tile            │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │  Per-tile NetCDF time-series
@@ -119,17 +119,17 @@ NASA CMR API
 
 | Step | Script | Step Name | Description |
 |------|--------|-----------|-------------|
-| 01 | `01_hls_download_query.sh` | `download` | Query NASA CMR API; download raw HLS granules (L30/S30 bands + Fmask) |
-| 02 | `02_hls_vi_calc.py` | `vi_calc` | Compute VI GeoTIFFs; apply configurable bitwise Fmask quality masking |
-| 03 | `03_hls_netcdf_build.py` | `netcdf` | Aggregate per-granule GeoTIFFs into CF-1.8 compliant NetCDF time-series per tile |
-| 04 | `04_hls_mean_reproject.py` | `mean_flat` | Temporal mean per tile; reproject to `TARGET_CRS` |
-| 05 | `05_hls_outlier_reproject.py` | `outlier_flat` | Outlier-aware mean + valid count per tile; reproject |
-| 06 | `06_hls_mean_mosaic.py` | `mean_mosaic` | Mosaic per-tile means into a study-area-wide GeoTIFF |
-| 07 | `07_hls_outlier_mean_mosaic.py` | `outlier_mosaic` | Mosaic outlier-filtered means |
-| 08 | `08_hls_outlier_count_mosaic.py` | `outlier_counts` | Mosaic valid-observation counts |
-| 09 | `09_hls_count_valid_mosaic.py` | `count_valid_mosaic` | Count valid observations per pixel across all download cycles; mosaic into a study-area-wide GeoTIFF |
-| 10 | `10_hls_timeseries_mosaic.py` | `timeseries` | Multi-band seasonal composite stacks with user-defined time windows |
-| 11 | `11_hls_outlier_gpkg.py` | `outlier_gpkg` | Export per-pixel outlier observations (value, date, location) to GeoPackage |
+| 01 | `src/01_hls_download_query.sh` | `download` | Query NASA CMR API; download raw HLS granules (L30/S30 bands + Fmask) |
+| 02 | `src/02_hls_vi_calc.py` | `vi_calc` | Compute VI GeoTIFFs; apply configurable bitwise Fmask quality masking |
+| 03 | `src/03_hls_netcdf_build.py` | `netcdf` | Aggregate per-granule GeoTIFFs into CF-1.8 compliant NetCDF time-series per tile |
+| 04 | `src/04_hls_mean_reproject.py` | `mean_flat` | Temporal mean per tile; reproject to `TARGET_CRS` |
+| 05 | `src/05_hls_outlier_reproject.py` | `outlier_flat` | Outlier-aware mean + valid count per tile; reproject |
+| 06 | `src/06_hls_mean_mosaic.py` | `mean_mosaic` | Mosaic per-tile means into a study-area-wide GeoTIFF |
+| 07 | `src/07_hls_outlier_mean_mosaic.py` | `outlier_mosaic` | Mosaic outlier-filtered means |
+| 08 | `src/08_hls_outlier_count_mosaic.py` | `outlier_counts` | Mosaic valid-observation counts |
+| 09 | `src/09_hls_count_valid_mosaic.py` | `count_valid_mosaic` | Count valid observations per pixel across all download cycles; mosaic into a study-area-wide GeoTIFF |
+| 10 | `src/10_hls_timeseries_mosaic.py` | `timeseries` | Multi-band seasonal composite stacks with user-defined time windows |
+| 11 | `src/11_hls_outlier_gpkg.py` | `outlier_gpkg` | Export per-pixel outlier observations (value, date, location) to GeoPackage |
 
 ---
 
@@ -718,15 +718,15 @@ If `TIMESLICE_ENABLED` is not set to `"TRUE"`, Step 10 will skip processing. Als
 **Stephen Conklin**, Geospatial Analyst — Pipeline architecture, orchestration, and all original code · [github.com/stephenconklin](https://github.com/stephenconklin)
 
 **G. Burch Fisher, PhD**, Research Scientist — Conceptual guidance and original code adapted for:
-- `02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)
-- `03_hls_netcdf_build.py` (NetCDF time-series assembly)
+- `src/02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)
+- `src/03_hls_netcdf_build.py` (NetCDF time-series assembly)
 
 **AI Assistance** — This pipeline was developed with the assistance of [Google Gemini](https://gemini.google.com/) and [Anthropic Claude / Claude Code](https://claude.ai/code). These tools assisted with code generation and refinement under the direction and review of the authors.
 
 ### Adapted Code
 
 **NASA HLS Download Script**
-`01_hls_download_query.sh` is adapted in part from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
+`src/01_hls_download_query.sh` is adapted in part from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
 
 ### HLS Data Citation
 
@@ -759,4 +759,4 @@ This pipeline is built on the following open-source libraries:
 
 This project is licensed under the [MIT License](https://github.com/stephenconklin/HLS_VI_Pipeline/blob/main/LICENSE).
 
-`01_hls_download_query.sh` is adapted in part from NASA's [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download), released by NASA under the [Apache 2.0 License](https://github.com/nasa/HLS-Data-Resources/blob/main/LICENSE).
+`src/01_hls_download_query.sh` is adapted in part from NASA's [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download), released by NASA under the [Apache 2.0 License](https://github.com/nasa/HLS-Data-Resources/blob/main/LICENSE).

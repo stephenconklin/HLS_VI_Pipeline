@@ -82,17 +82,17 @@ order, any combination) or convenience aliases.
 
 | Value | Step | Script | Description |
 |-------|------|--------|-------------|
-| `download` | 01 | `01_hls_download_query.sh` | Query NASA CMR API; download raw HLS bands and Fmask |
-| `vi_calc` | 02 | `02_hls_vi_calc.py` | Compute VI GeoTIFFs from raw bands; apply Fmask masking |
-| `netcdf` | 03 | `03_hls_netcdf_build.py` | Aggregate per-granule VI GeoTIFFs into per-tile CF-1.8 NetCDF time-series |
-| `mean_flat` | 04 | `04_hls_mean_reproject.py` | Temporal mean per tile; reproject to `TARGET_CRS` |
-| `outlier_flat` | 05 | `05_hls_outlier_reproject.py` | Outlier-aware mean + valid count per tile; reproject |
-| `mean_mosaic` | 06 | `06_hls_mean_mosaic.py` | Mosaic per-tile means into a single study-area-wide GeoTIFF |
-| `outlier_mosaic` | 07 | `07_hls_outlier_mean_mosaic.py` | Mosaic outlier-filtered mean tiles |
-| `outlier_counts` | 08 | `08_hls_outlier_count_mosaic.py` | Mosaic outlier pixel count tiles |
-| `count_valid_mosaic` | 09 | `09_hls_count_valid_mosaic.py` | Count valid observations per pixel across all download cycles; mosaic result |
-| `timeseries` | 10 | `10_hls_timeseries_mosaic.py` | Multi-band time-window stacks defined by `TIMESLICE_WINDOWS` |
-| `outlier_gpkg` | 11 | `11_hls_outlier_gpkg.py` | Export per-pixel outlier observations to a GeoPackage point vector file |
+| `download` | 01 | `src/01_hls_download_query.sh` | Query NASA CMR API; download raw HLS bands and Fmask |
+| `vi_calc` | 02 | `src/02_hls_vi_calc.py` | Compute VI GeoTIFFs from raw bands; apply Fmask masking |
+| `netcdf` | 03 | `src/03_hls_netcdf_build.py` | Aggregate per-granule VI GeoTIFFs into per-tile CF-1.8 NetCDF time-series |
+| `mean_flat` | 04 | `src/04_hls_mean_reproject.py` | Temporal mean per tile; reproject to `TARGET_CRS` |
+| `outlier_flat` | 05 | `src/05_hls_outlier_reproject.py` | Outlier-aware mean + valid count per tile; reproject |
+| `mean_mosaic` | 06 | `src/06_hls_mean_mosaic.py` | Mosaic per-tile means into a single study-area-wide GeoTIFF |
+| `outlier_mosaic` | 07 | `src/07_hls_outlier_mean_mosaic.py` | Mosaic outlier-filtered mean tiles |
+| `outlier_counts` | 08 | `src/08_hls_outlier_count_mosaic.py` | Mosaic outlier pixel count tiles |
+| `count_valid_mosaic` | 09 | `src/09_hls_count_valid_mosaic.py` | Count valid observations per pixel across all download cycles; mosaic result |
+| `timeseries` | 10 | `src/10_hls_timeseries_mosaic.py` | Multi-band time-window stacks defined by `TIMESLICE_WINDOWS` |
+| `outlier_gpkg` | 11 | `src/11_hls_outlier_gpkg.py` | Export per-pixel outlier observations to a GeoPackage point vector file |
 
 ### Convenience aliases
 

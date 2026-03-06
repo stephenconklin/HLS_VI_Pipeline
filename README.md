@@ -125,15 +125,15 @@ bash hls_pipeline.sh
 **Stephen Conklin**, Geospatial Analyst — Pipeline architecture, orchestration, and all original code · [github.com/stephenconklin](https://github.com/stephenconklin)
 
 **G. Burch Fisher, PhD**, Research Scientist — Conceptual guidance and original code adapted for:
-- `02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)
-- `03_hls_netcdf_build.py` (NetCDF time-series assembly)
+- `src/02_hls_vi_calc.py` (VI calculation and Fmask quality masking logic)
+- `src/03_hls_netcdf_build.py` (NetCDF time-series assembly)
 
 **AI Assistance** — This pipeline was developed with the assistance of [Google Gemini](https://gemini.google.com/) and [Anthropic Claude / Claude Code](https://claude.ai/code). These tools assisted with code generation and refinement under the direction and review of the authors.
 
 ### Adapted Code
 
 **NASA HLS Download Script**
-`01_hls_download_query.sh` is adapted in part from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
+`src/01_hls_download_query.sh` is adapted in part from the NASA [`getHLS.sh`](https://github.com/nasa/HLS-Data-Resources/tree/main/bash/hls-bulk-download) script, published by the NASA HLS Data Resources Team under the Apache 2.0 License.
 
 ### HLS Data Citation
 
