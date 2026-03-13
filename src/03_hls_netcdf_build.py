@@ -308,7 +308,7 @@ class HLSNetCDFAggregator:
                         transform = src.transform
                         crs = src.crs
                         shape = src.shape
-                        crs_wkt = crs.to_wkt()
+                        crs_wkt = ProjCRS.from_user_input(crs).to_wkt()
                         width = src.width
                         height = src.height
                         
