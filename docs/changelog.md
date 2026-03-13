@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2026-03-12
+
+### Changed
+- **Pipeline scripts moved to `src/`** — all 11 step scripts
+  (`01_hls_download_query.sh` – `11_hls_outlier_gpkg.py`) and `hls_utils.py`
+  relocated from the repository root into `src/`. `hls_pipeline.sh` remains at
+  the root. All invocation paths in `hls_pipeline.sh`, `CLAUDE.md`, `README.md`,
+  and `docs/` updated accordingly. Python `import hls_utils` statements are
+  unaffected (Python resolves the import from the script's own directory).
+- **Step 03 — improved CF-1.8 CRS metadata in NetCDF output** — the
+  `spatial_ref` grid-mapping variable now carries both `crs_wkt` (CF-1.8
+  standard) and `spatial_ref` (GDAL / rioxarray compatibility) attributes, plus
+  `grid_mapping_name` (derived via pyproj) and `long_name`. The `x`/`y`
+  coordinate variables now include `standard_name`, `long_name`, and `axis`
+  attributes; the `time` variable now includes `standard_name`, `calendar`, and
+  `axis`. A global `Conventions = "CF-1.8"` attribute is now written. The
+  `merge_chunks` path mirrors all the same attributes. These changes make
+  `da.rio.crs` (rioxarray path 1 in `detect_crs()`) reliably resolve without
+  falling back to the global `crs` attribute. Existing NetCDF files built with
+  the prior format remain readable via the `detect_crs()` fallback chain.
+
+---
+
 ## 2026-02-28
 
 ### Added

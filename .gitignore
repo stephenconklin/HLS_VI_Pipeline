@@ -30,6 +30,8 @@ HLS_VI_Pipeline.code-workspace
 
 # Local configuration overrides (user-specific, not for version control)
 config.local.env
+config.local.BioSCape.env
+config.local.PA_Laurel.env
 
 # Runtime artifacts
 tiles_active_run.txt

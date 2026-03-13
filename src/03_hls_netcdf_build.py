@@ -15,6 +15,7 @@ import numpy as np
 import netCDF4 as nc4
 import rasterio
 from rasterio.crs import CRS
+from pyproj import CRS as ProjCRS
 import pandas as pd
 from pathlib import Path
 import multiprocessing as mp
@@ -23,6 +24,14 @@ import glob
 from hls_utils import get_configured_tiles
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
+
+
+def _grid_mapping_name(wkt: str) -> str:
+    """Return the CF grid_mapping_name for a CRS WKT string."""
+    try:
+        return ProjCRS.from_wkt(wkt).to_cf()["grid_mapping_name"]
+    except Exception:
+        return "crs"
 
 def process_netcdf_chunk(chunk_info):
     # Worker function (Must be top-level)
@@ -64,22 +73,32 @@ def process_netcdf_chunk(chunk_info):
             time_var = nc.createVariable('time', 'i4', ('time',))
             time_var[:] = time_values
             time_var.units = 'days since 1970-01-01'
-            
+            time_var.standard_name = 'time'
+            time_var.calendar = 'proleptic_gregorian'
+            time_var.axis = 'T'
+
             # Spatial Variables
             y_var = nc.createVariable('y', 'f8', ('y',))
             y_var[:] = y_coords
-            y_var.units = 'meter' # Assumption for UTM
-            
+            y_var.units = 'meter'
+            y_var.standard_name = 'projection_y_coordinate'
+            y_var.long_name = 'Northing'
+            y_var.axis = 'Y'
+
             x_var = nc.createVariable('x', 'f8', ('x',))
             x_var[:] = x_coords
             x_var.units = 'meter'
+            x_var.standard_name = 'projection_x_coordinate'
+            x_var.long_name = 'Easting'
+            x_var.axis = 'X'
 
-            # --- NEW: Grid Mapping Variable for Universal CRS ---
-            # This is the standard CF-convention way to store CRS
+            # Grid mapping variable (CF-1.8 + GDAL/rioxarray compatible)
             crs_var = nc.createVariable('spatial_ref', 'i4')
+            crs_var[:] = np.int32(0)
+            crs_var.crs_wkt = crs_wkt
             crs_var.spatial_ref = crs_wkt
-            # Add simple EPSG attribute if available
-            # (You might need to parse this upstream if you want a clean EPSG code)
+            crs_var.grid_mapping_name = _grid_mapping_name(crs_wkt)
+            crs_var.long_name = 'CRS definition'
             
             # Data Variable
             vi_var = nc.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True, complevel=chunk_info.get('complevel', 1), fill_value=np.nan)
@@ -102,8 +121,8 @@ def process_netcdf_chunk(chunk_info):
                     vi_var[i, :, :] = np.nan
             
             # Global Attributes
+            nc.Conventions = 'CF-1.8'
             nc.title = f'HLS {vi_type} Tile {tile_id}'
-            # Also write CRS to global attribute for redundancy
             nc.crs = crs_wkt
             
         return f"✓ Chunk {chunk_id}: {output_filename}"
@@ -160,8 +179,13 @@ class HLSNetCDFAggregator:
             with nc4.Dataset(chunk_files[0], 'r') as src:
                 y_coords = src.variables['y'][:]
                 x_coords = src.variables['x'][:]
-                crs_wkt = src.getncattr('crs') if 'crs' in src.ncattrs() else ""
-                # Check for spatial_ref variable
+                # Prefer crs_wkt attribute on spatial_ref variable; fall back to global attr
+                if 'spatial_ref' in src.variables and hasattr(src.variables['spatial_ref'], 'crs_wkt'):
+                    crs_wkt = src.variables['spatial_ref'].crs_wkt
+                elif 'crs' in src.ncattrs():
+                    crs_wkt = src.getncattr('crs')
+                else:
+                    crs_wkt = ""
                 has_spatial_ref = 'spatial_ref' in src.variables
 
             # Calculate total time dimension
@@ -177,14 +201,32 @@ class HLSNetCDFAggregator:
                 
                 t_var = dst.createVariable('time', 'i4', ('time',))
                 t_var.units = 'days since 1970-01-01'
-                
-                dst.createVariable('y', 'f8', ('y',))[:] = y_coords
-                dst.createVariable('x', 'f8', ('x',))[:] = x_coords
+                t_var.standard_name = 'time'
+                t_var.calendar = 'proleptic_gregorian'
+                t_var.axis = 'T'
+
+                y_var = dst.createVariable('y', 'f8', ('y',))
+                y_var[:] = y_coords
+                y_var.units = 'meter'
+                y_var.standard_name = 'projection_y_coordinate'
+                y_var.long_name = 'Northing'
+                y_var.axis = 'Y'
+
+                x_var = dst.createVariable('x', 'f8', ('x',))
+                x_var[:] = x_coords
+                x_var.units = 'meter'
+                x_var.standard_name = 'projection_x_coordinate'
+                x_var.long_name = 'Easting'
+                x_var.axis = 'X'
 
                 # Re-create spatial_ref
                 if has_spatial_ref:
                     crs_var = dst.createVariable('spatial_ref', 'i4')
+                    crs_var[:] = np.int32(0)
+                    crs_var.crs_wkt = crs_wkt
                     crs_var.spatial_ref = crs_wkt
+                    crs_var.grid_mapping_name = _grid_mapping_name(crs_wkt)
+                    crs_var.long_name = 'CRS definition'
 
                 vi_var = dst.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True, complevel=self.netcdf_complevel)
                 if has_spatial_ref: vi_var.grid_mapping = 'spatial_ref'
@@ -201,6 +243,7 @@ class HLSNetCDFAggregator:
                         s_var[current_t:current_t+t_len] = src.variables['sensor'][:]
                         current_t += t_len
                 
+                dst.Conventions = 'CF-1.8'
                 dst.title = f'HLS {vi_type} {tile_id}'
                 dst.crs = crs_wkt
             
