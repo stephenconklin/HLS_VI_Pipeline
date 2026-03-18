@@ -33,6 +33,9 @@ HLS_VI_Pipeline.code-workspace
 config.local.env
 config.local.*.env
 
+# Claude Code local memory (session-private, not for version control)
+memory/
+
 # Runtime artifacts
 tiles_active_run.txt
 *.log
