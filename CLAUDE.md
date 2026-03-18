@@ -14,11 +14,18 @@ conda activate hls_pipeline
 export PYTHONUNBUFFERED=1
 ```
 
+Step 01 (download) also requires:
+- `~/.netrc` with NASA Earthdata credentials (`machine urs.earthdata.nasa.gov login <user> password <pass>`) — the script exits immediately if this file is absent.
+- `wget` or `curl` available on `PATH` (the script probes for both and uses whichever is found).
+
 ## Running the Pipeline
 
 ```bash
+conda activate hls_pipeline
 bash hls_pipeline.sh
 ```
+
+`hls_pipeline.sh` loads `config.env` first, then automatically loads `config.local.env` if it exists. Use `config.local.env` for project-specific or machine-specific overrides without modifying the committed `config.env` (it is gitignored). Any variable set in `config.local.env` overrides the same variable from `config.env`.
 
 The `STEPS` variable in `config.env` controls which steps run. Valid values:
 - Named steps: `download`, `vi_calc`, `netcdf`, `mean_flat`, `outlier_flat`, `mean_mosaic`, `outlier_mosaic`, `outlier_counts`, `count_valid_mosaic`, `timeseries`, `outlier_gpkg`
@@ -29,6 +36,7 @@ The `STEPS` variable in `config.env` controls which steps run. Valid values:
 All pipeline parameters live in `config.env`. Key sections:
 - **Paths**: `BASE_DIR`, `LOG_DIR`, `RAW_HLS_DIR`, `VI_OUTPUT_DIR`, `NETCDF_DIR`, `REPROJECTED_DIR`, `REPROJECTED_DIR_OUTLIERS`, `MOSAIC_DIR`, `TIMESLICE_OUTPUT_DIR`, `OUTLIER_GPKG_DIR`
 - **Processing**: `NUM_WORKERS`, `CHUNK_SIZE`, `TARGET_CRS` (default `EPSG:6350` — NAD83 Conus Albers, 30 m output resolution; must be a projected CRS in metres)
+- **Download filters**: `CLOUD_COVERAGE_MAX` (0–100, default `75`), `SPATIAL_COVERAGE_MIN` (0–100, default `0`) — CMR-side granule filters applied before download
 - **Output format**: `NETCDF_COMPLEVEL` (int 0–9, default `1` — zlib level for step 03 NetCDF); `GEOTIFF_COMPRESS` (default `LZW` — codec for all GeoTIFF outputs, steps 02 + 04–10); `GEOTIFF_BLOCK_SIZE` (int, default `512` — tile block dimension for tiled GeoTIFFs, steps 04–10)
 - **VI selection**: `PROCESSED_VIS` — space-separated list of `NDVI`, `EVI2`, `NIRv`
 - **Fmask masking**: Individual boolean flags for cirrus, cloud, adjacent cloud, shadow, snow/ice, water, and aerosol mode (`NONE`/`HIGH`/`MODERATE`/`LOW`)
@@ -90,6 +98,9 @@ NASA CMR API → 01 (raw L30/S30 + Fmask)
 **CRS detection** (used by steps 04, 05, 09, 10):
 - `detect_crs(ds, da)` — tries `da.rio.crs`, then `ds.attrs['crs']`, then per-variable `crs_wkt`/`spatial_ref` attributes; returns first match or `None`
 
+**Reproject resolution** (used by steps 04, 05, 09, 10):
+- `reproject_resolution(target_crs, meters=30.0)` — returns the resolution to pass to `rio.reproject()` in target CRS units; handles projected CRS (returns `meters` unchanged) and geographic CRS (converts to decimal degrees with a warning; geographic CRS is not recommended for pixel-level VI analysis)
+
 Add future shared helpers here rather than duplicating across scripts.
 
 ## Key Patterns
@@ -115,6 +126,23 @@ All `np.errstate(divide='ignore', invalid='ignore')` is used to suppress divide-
 **Worker error handling**: Workers never raise to the main process. Steps 02, 04, and 05 return status strings (e.g., `"OK: ..."`, `"Skipped (Exists): ..."`, `"ERROR: ..."`); the main loop checks the returned string prefix. Steps 09 and 10 return dicts (`{'status': 'ok'|'skip'|'error', 'message': ..., ...}`); the main loop checks `result['status']`. In both patterns, if an output file already exists the worker returns a skip result and does no computation. Step 11 has no worker — `iter_tile_chunks` is a generator that yields fiona feature dicts per time-chunk; the main loop streams writes directly to fiona and catches exceptions per tile with `try/except`.
 
 **Outlier handling**: "Outliers" are valid (unmasked) pixels outside per-VI min/max bounds (`np.isfinite(data) & ((data < vmin) | (data > vmax))`). Steps 05/07/08 produce raster summaries (mean + count); step 11 produces a point vector record for every individual outlier pixel-date observation, with coordinates reprojected to WGS84 (EPSG:4326) via `pyproj.Transformer`.
+
+**Southern hemisphere CRS correction (step 03)**: HLS v2.0 GeoTIFFs for tiles south of
+the equator embed a UTM North zone (EPSG:326xx) with negative northings instead of the
+standard UTM South convention (EPSG:327xx, false_northing=10,000,000). Step 03
+(`src/03_hls_netcdf_build.py`) detects this case in `HLSNetCDFAggregator.run()` after
+reading the first GeoTIFF's CRS: if `to_epsg(min_confidence=20)` returns a UTM North
+code (32601–32660) AND the pixel-center y mean is negative, the CRS is replaced with the
+UTM South equivalent (EPSG + 100) and y-coordinates are shifted by +10,000,000 m. The
+corrected values flow into every chunk dict and the merged output. After the fix, southern
+hemisphere tiles carry EPSG:327xx CRS with positive northings (6–9 million m range),
+matching the standard UTM South convention expected by GIS tools and CF-1.8 validators.
+
+**NetCDF fill value consistency**: Both `process_netcdf_chunk` and `merge_chunks` in
+`src/03_hls_netcdf_build.py` must create the VI variable with `fill_value=np.nan`.
+If `fill_value` is omitted from either call, netCDF4 silently uses its default sentinel
+(`9.969209968386869e+36`) and writes no `_FillValue` attribute — making the file
+ambiguous to any downstream tool that doesn't apply an explicit valid-range filter.
 
 **Temporal storage**: NetCDF files store dates as integer "days since 1970-01-01". Step 10 parses named time windows from `TIMESLICE_WINDOWS` to produce per-window multi-band mosaics with window labels stored in band descriptions.
 

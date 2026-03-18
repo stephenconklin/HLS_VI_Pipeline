@@ -478,7 +478,8 @@ Aggregates per-granule VI GeoTIFFs into per-tile time-series files.
 
 - **Inputs:** VI GeoTIFFs from `VI_OUTPUT_DIR`
 - **Outputs:** `T{TILE}_{VI}.nc` in `NETCDF_DIR` — CF-1.8 compliant with `days since 1970-01-01` time encoding and sensor (L30/S30) metadata per observation
-- **Parallelism:** Chunked writes with `ProcessPoolExecutor`
+- **Parallelism:** Chunked writes with `multiprocessing.Pool`
+- **Southern hemisphere CRS correction:** HLS v2.0 GeoTIFFs for tiles south of the equator embed a UTM North zone (EPSG:326xx) with negative northings instead of the standard UTM South convention (EPSG:327xx, false_northing=10,000,000). Step 03 automatically detects this case (UTM North EPSG code + negative y centroid) and corrects it: the CRS is replaced with the UTM South equivalent (EPSG + 100) and y-coordinates are shifted by +10,000,000 m. The output NetCDF files carry the correct EPSG:327xx CRS with positive northings, as expected by GIS tools and CF-1.8 validators. This correction is applied transparently and logged with a `[CRS fix]` prefix in the pipeline output.
 
 ### Step 04 — Temporal Mean + Reproject
 

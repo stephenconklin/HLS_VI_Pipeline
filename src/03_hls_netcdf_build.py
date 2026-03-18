@@ -228,7 +228,7 @@ class HLSNetCDFAggregator:
                     crs_var.grid_mapping_name = _grid_mapping_name(crs_wkt)
                     crs_var.long_name = 'CRS definition'
 
-                vi_var = dst.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True, complevel=self.netcdf_complevel)
+                vi_var = dst.createVariable(vi_type, 'f4', ('time', 'y', 'x'), zlib=True, complevel=self.netcdf_complevel, fill_value=np.nan)
                 if has_spatial_ref: vi_var.grid_mapping = 'spatial_ref'
                 
                 s_var = dst.createVariable('sensor', 'S3', ('time',))
@@ -317,7 +317,28 @@ class HLSNetCDFAggregator:
                         # Center of pixel i = corner + pixel_size * (i + 0.5)
                         x_coords = transform.c + transform.a * (np.arange(width)  + 0.5)
                         y_coords = transform.f + transform.e * (np.arange(height) + 0.5)
-                    
+
+                    # Correct CRS and y-coordinates for southern hemisphere tiles.
+                    # HLS v2.0 GeoTIFFs for tiles south of the equator are stored
+                    # using a UTM North zone (EPSG:326xx, false_northing=0) with
+                    # negative northings rather than the standard UTM South convention
+                    # (EPSG:327xx, false_northing=10,000,000). Detect this case and
+                    # convert: add 100 to the EPSG zone number to get the UTM South
+                    # equivalent, then shift y-coordinates by +10,000,000 m so all
+                    # downstream tools (GIS apps, CF-1.8 validators, pyproj) correctly
+                    # identify the data as southern hemisphere.
+                    try:
+                        _epsg = ProjCRS.from_wkt(crs_wkt).to_epsg(min_confidence=20)
+                        if _epsg is not None and 32601 <= _epsg <= 32660 and y_coords.mean() < 0:
+                            _south_epsg = _epsg + 100   # e.g. 32634 → 32734
+                            crs_wkt = ProjCRS.from_epsg(_south_epsg).to_wkt()
+                            y_coords = y_coords + 10_000_000.0
+                            print(f"  [CRS fix] {tile_id}: EPSG:{_epsg} + negative northings "
+                                  f"→ corrected to EPSG:{_south_epsg} (UTM South)")
+                    except Exception as _crs_err:
+                        print(f"  [CRS fix] {tile_id}: hemisphere check failed ({_crs_err}) — "
+                              f"using original CRS unchanged")
+
                     # Create Chunks
                     chunks = []
                     total_chunks = (len(files) + chunk_size - 1) // chunk_size

@@ -4,6 +4,42 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2026-03-18 (2)
+
+### Fixed
+- **Step 03 — southern hemisphere CRS stored as UTM North** — HLS v2.0 GeoTIFFs
+  for tiles south of the equator embed a UTM North zone (EPSG:326xx) with negative
+  northings instead of the standard UTM South convention (EPSG:327xx,
+  false_northing=10,000,000). All southern Africa (BioSCape) and other southern
+  hemisphere tiles were affected. `HLSNetCDFAggregator.run()` in
+  `src/03_hls_netcdf_build.py` now detects this case after reading the first
+  GeoTIFF: if `pyproj.to_epsg(min_confidence=20)` returns a UTM North code
+  (32601–32660) and the pixel-center y mean is negative, the CRS WKT is replaced
+  with the UTM South equivalent (EPSG + 100, e.g. 32634 → 32734) and
+  y-coordinates are shifted by +10,000,000 m. This correction is applied before
+  chunk dicts are built, so both single-chunk and merged tiles are written with
+  the correct EPSG:327xx CRS and positive UTM South northings. Previously rebuilt
+  tiles will need to be regenerated with step 03 to pick up the corrected CRS and
+  coordinates; downstream steps 04–11 that reproject to `TARGET_CRS` are not
+  affected because they perform a full reprojection from the source CRS.
+
+---
+
+## 2026-03-18
+
+### Fixed
+- **Step 03 — `_FillValue` lost in `merge_chunks`** — `process_netcdf_chunk` correctly
+  creates the VI variable with `fill_value=np.nan`, but `merge_chunks` recreated the
+  same variable without a `fill_value` argument. netCDF4 therefore fell back to its
+  built-in default sentinel (`9.969209968386869e+36`) for all missing cells in merged
+  files, and the `_FillValue` attribute was absent from the output. Any tile requiring
+  chunk merging (virtually all multi-year tiles with more acquisitions than `CHUNK_SIZE`)
+  was affected. Fixed by adding `fill_value=np.nan` to the `createVariable` call in
+  `merge_chunks` (`src/03_hls_netcdf_build.py` line 231). Newly rebuilt tiles will store
+  missing data as `NaN` and carry a proper `_FillValue = NaN` attribute.
+
+---
+
 ## 2026-03-12
 
 ### Changed
@@ -24,6 +60,17 @@ All notable changes to this project are documented here.
   `da.rio.crs` (rioxarray path 1 in `detect_crs()`) reliably resolve without
   falling back to the global `crs` attribute. Existing NetCDF files built with
   the prior format remain readable via the `detect_crs()` fallback chain.
+- **Step 03 — CRS WKT stored as pyproj WKT2 instead of GDAL WKT1** —
+  `HLSNetCDFAggregator.run()` now generates the CRS WKT string via
+  `ProjCRS.from_user_input(crs).to_wkt()` (pyproj WKT2) instead of
+  rasterio's `crs.to_wkt()` (GDAL WKT1). GDAL WKT1 for some HLS tiles
+  lacks a top-level `AUTHORITY["EPSG","XXXXX"]` node, causing
+  `pyproj.CRS.from_wkt(wkt).to_epsg()` to return `None`. Downstream
+  consumers that group tiles by EPSG code (e.g. cross-CRS reprojection
+  checks) would treat same-zone tiles as different CRS groups. The pyproj
+  WKT2 output always includes a resolvable authority node. Existing NetCDF
+  files retain their original WKT; rebuilding with step 03 is recommended
+  for tiles where EPSG grouping matters downstream.
 
 ---
 
