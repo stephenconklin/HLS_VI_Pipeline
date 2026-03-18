@@ -32,6 +32,7 @@ HLS_VI_Pipeline.code-workspace
 config.local.env
 config.local.BioSCape.env
 config.local.PA_Laurel.env
+config.local.Durango.env
 
 # Runtime artifacts
 tiles_active_run.txt
