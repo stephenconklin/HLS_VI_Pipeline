@@ -20,6 +20,7 @@ env/
 .ipynb_checkpoints/
 
 # VS Code
+.vscode/
 HLS_VI_Pipeline.code-workspace
 
 # Data outputs (large files, not for version control)
@@ -30,9 +31,9 @@ HLS_VI_Pipeline.code-workspace
 
 # Local configuration overrides (user-specific, not for version control)
 config.local.env
-config.local.BioSCape.env
-config.local.PA_Laurel.env
-config.local.Durango.env
+config.local.*.env
 
 # Runtime artifacts
 tiles_active_run.txt
+*.log
+logs/
