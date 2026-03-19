@@ -49,7 +49,7 @@ def setup_logging(step_name: str) -> logging.Logger:
             fmt='%(asctime)s  %(levelname)-8s  [%(name)s]  %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S',
         ))
-        root.setLevel(logging.DEBUG)
+        root.setLevel(logging.INFO)
         root.addHandler(handler)
     return logging.getLogger(step_name)
 

@@ -87,23 +87,28 @@ NASA CMR API → 01 (raw L30/S30 + Fmask)
 
 **`src/hls_utils.py`** — shared utility module imported by all Python pipeline steps (02–11).
 
+**Logging** (used by all steps):
+- `setup_logging(step_name)` — configures the root logger (once, idempotent via `if not root.handlers` guard) with a `StreamHandler` writing to `sys.stdout`, and returns a named logger for the calling script. Format: `2026-03-18 20:55:49  INFO      [step_name]  message`. Called at module level in each pipeline script; safe for child processes spawned by `multiprocessing.Pool` or `ProcessPoolExecutor`.
+
 **Tile filtering** (used by all steps):
 - `get_configured_tiles()` — returns `set` of tile IDs from `HLS_TILES` env var, or empty set (no filter)
 - `tile_id_from_path(filepath)` — extracts bare MGRS tile ID from any HLS filename (handles both dot-separated raw/VI GeoTIFF names and underscore-separated NetCDF/reprojected names)
 - `filter_by_configured_tiles(filepaths)` — filters a file list to only those matching `HLS_TILES`; pass-through if `HLS_TILES` is unset
 
 **VI valid ranges** (used by steps 04, 05, 09, 10, 11):
-- `get_valid_range(vi_type)` — returns `(vmin, vmax)` from `VALID_RANGE_{VI}` env var; falls back to per-VI defaults and prints a warning if the variable is missing or unparseable
+- `get_valid_range(vi_type)` — returns `(vmin, vmax)` from `VALID_RANGE_{VI}` env var; falls back to per-VI defaults and logs a warning if the variable is missing or unparseable
 
 **CRS detection** (used by steps 04, 05, 09, 10):
 - `detect_crs(ds, da)` — tries `da.rio.crs`, then `ds.attrs['crs']`, then per-variable `crs_wkt`/`spatial_ref` attributes; returns first match or `None`
 
 **Reproject resolution** (used by steps 04, 05, 09, 10):
-- `reproject_resolution(target_crs, meters=30.0)` — returns the resolution to pass to `rio.reproject()` in target CRS units; handles projected CRS (returns `meters` unchanged) and geographic CRS (converts to decimal degrees with a warning; geographic CRS is not recommended for pixel-level VI analysis)
+- `reproject_resolution(target_crs, meters=30.0)` — returns the resolution to pass to `rio.reproject()` in target CRS units; handles projected CRS (returns `meters` unchanged) and geographic CRS (converts to decimal degrees and logs a warning; geographic CRS is not recommended for pixel-level VI analysis)
 
 Add future shared helpers here rather than duplicating across scripts.
 
 ## Key Patterns
+
+**Logging**: All Python steps (02–11) call `setup_logging(step_name)` from `hls_utils.py` at module level and log via `logger.*()` (never `print()`). Format matches the VI_Phenology style: `YYYY-MM-DD HH:MM:SS  LEVEL     [step_name]  message`. The root logger handler guard (`if not root.handlers`) makes `setup_logging` idempotent — safe to call in worker child processes without producing duplicate output. Workers (steps 02–05, 09–10) never call `logger` directly; they return status strings or dicts to the main process, which performs all logging. In child processes with no configured handlers, Python's `lastResort` handler still emits WARNING+ to stderr (captured by `2>&1 | tee`). Shell helpers `log_info`, `log_warn`, and `log_error` in `hls_pipeline.sh` use the same timestamp + level + `[pipeline]` format so mixed shell/Python log output is visually consistent. Formatted table blocks (storage estimate, PIPELINE COMPLETE banner) are left as plain `echo` to preserve column alignment.
 
 **Tile enforcement**: `HLS_TILES` in `config.env` is enforced at every processing step. Steps 02–11 call `filter_by_configured_tiles()` immediately after each glob so only configured tiles are processed. Step 01 (download) uses `HLS_TILES` natively via CMR API queries.
 
