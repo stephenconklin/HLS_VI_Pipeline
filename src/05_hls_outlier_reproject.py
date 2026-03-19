@@ -168,6 +168,8 @@ def main():
             if result.startswith("OK"):
                 if completed % 5 == 0 or completed == total:
                     logger.info(f"  [{completed}/{total}] {result}")
+            elif result.startswith("Skipped"):
+                logger.info(f"  [{completed}/{total}] {result}")
             elif result.startswith("WARNING"):
                 logger.warning(f"  [{completed}/{total}] {result}")
             else:

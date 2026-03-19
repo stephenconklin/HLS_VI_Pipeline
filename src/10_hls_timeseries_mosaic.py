@@ -207,12 +207,14 @@ def _process_tile_window(args: dict) -> dict:
 
         reproj_mean.encoding.clear()
         reproj_mean.rio.to_raster(mean_tmp, compress=GEOTIFF_COMPRESS,
+                                   tiled=True,
                                    blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
                                    dtype='float32', nodata=np.nan)
 
         reproj_count.encoding.clear()
         reproj_count.rio.write_nodata(0, encoded=True, inplace=True)
         reproj_count.rio.to_raster(count_tmp, compress=GEOTIFF_COMPRESS,
+                                    tiled=True,
                                     blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
                                     dtype='uint16')
 

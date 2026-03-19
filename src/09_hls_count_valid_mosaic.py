@@ -77,7 +77,7 @@ def _process_tile(args: dict) -> dict:
     tile_id  = filename.split('_')[0] if '_' in filename else filename.replace('.nc', '')
 
     try:
-        ds = xr.open_dataset(nc_path, chunks={'time': 10})
+        ds = xr.open_dataset(nc_path, chunks='auto')
 
         if vi_type in ds.data_vars:
             da = ds[vi_type]
@@ -114,6 +114,7 @@ def _process_tile(args: dict) -> dict:
         reproj_count.encoding.clear()
         reproj_count.rio.write_nodata(0, encoded=True, inplace=True)
         reproj_count.rio.to_raster(count_tmp, compress=GEOTIFF_COMPRESS,
+                                   tiled=True,
                                    blockxsize=GEOTIFF_BLOCK_SIZE, blockysize=GEOTIFF_BLOCK_SIZE,
                                    dtype='uint16')
 
