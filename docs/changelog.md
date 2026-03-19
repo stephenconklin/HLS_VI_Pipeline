@@ -4,6 +4,58 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2026-03-18 (4)
+
+### Fixed
+- **Root logger level `DEBUG` → `INFO`** — `setup_logging()` in `hls_utils.py` set the
+  root logger to `DEBUG`, causing rasterio and GDAL internal trace messages to flood the
+  log (thousands of `DEBUG [rasterio.env]` / `DEBUG [rasterio._io]` lines per run).
+  Changed to `INFO` so only pipeline-level messages and library `WARNING`+ output appear.
+- **Steps 04/05: `"Skipped"` results logged at `ERROR`** — the result-dispatch logic in
+  the main loop of steps 04 and 05 routed any string not starting with `"OK"` or
+  `"WARNING"` to `logger.error`. `"Skipped (Exists)"` (step 04) and
+  `"Skipped (No outliers)"` (step 05) both fell into this branch. Added an explicit
+  `Skipped` prefix check → `logger.info` before the error fallthrough.
+- **Steps 09/10: `BLOCKXSIZE` without `TILED=YES` in temp tile writes** — `to_raster()`
+  calls for intermediate temp GeoTIFFs in steps 09 and 10 passed `blockxsize`/`blockysize`
+  without `tiled=True`, producing GDAL `CPLE_IllegalArg` warnings on every tile. Added
+  `tiled=True` to all three affected `to_raster()` calls.
+- **Step 09: dask chunk mismatch `UserWarning`** — `xr.open_dataset(nc_path, chunks={'time': 10})`
+  produced a dask performance warning when the on-disk NetCDF chunk layout differed from
+  the requested chunking. Changed to `chunks='auto'` to align with on-disk layout,
+  consistent with how steps 04, 05, and 10 open datasets.
+- **Step 03: CRS remap log message rewording** — the southern hemisphere CRS adjustment
+  log line used `[CRS fix]` and `corrected to`, implying an error condition. Replaced
+  with `[CRS]` and `southern hemisphere tile, remapped … → …` to reflect that this is
+  routine, expected processing for any southern hemisphere tile.
+
+---
+
+## 2026-03-18 (3)
+
+### Added
+- **Structured logging across all Python steps and `hls_pipeline.sh`** — all ten
+  Python pipeline scripts (steps 02–11) now use Python's `logging` module via a
+  shared `setup_logging(step_name)` helper in `src/hls_utils.py`. Every log line
+  carries a timestamp, level, and bracketed step label:
+  `2026-03-18 20:55:49  INFO      [04_mean_reproject]  message`. Previously all
+  diagnostic output used bare `print()` calls with no timestamps or severity levels.
+  Key design points:
+  - Single implementation in `hls_utils.py`; no logging boilerplate duplicated
+    across scripts.
+  - Root logger handler guard (`if not root.handlers`) makes `setup_logging`
+    idempotent — calling it in `multiprocessing.Pool` or `ProcessPoolExecutor`
+    child processes does not produce duplicate output.
+  - Worker functions (steps 02–05, 09–10) are unchanged; they return status
+    strings/dicts to the main process, which performs all `logger.*()` calls.
+  - `StreamHandler` targets `sys.stdout` so `2>&1 | tee -a "$LOGFILE"` in the
+    shell captures all output.
+  - `hls_pipeline.sh` gains `log_info`, `log_warn`, and `log_error` helper
+    functions that emit the same timestamp + level + `[pipeline]` format, making
+    combined shell/Python log output visually consistent.
+
+---
+
 ## 2026-03-18 (2)
 
 ### Fixed
@@ -89,7 +141,7 @@ All notable changes to this project are documented here.
 - **`reproject_resolution()` in `hls_utils.py`** — CRS-unit-aware resolution
   helper replacing all hardcoded `resolution=30` calls in steps 04, 05, 09, 10.
   Returns metres unchanged for projected CRS; converts to approximate degrees
-  for geographic CRS and prints a `[WARN]`.
+  for geographic CRS and logs a warning.
 
 ### Fixed
 - Steps 04, 05, 09, and 10 produced a 1×1 pixel output with no valid data when

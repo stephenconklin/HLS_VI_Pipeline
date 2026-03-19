@@ -35,7 +35,9 @@ import numpy as np
 import pandas as pd
 import netCDF4 as nc4
 from pyproj import Transformer
-from hls_utils import filter_by_configured_tiles, get_valid_range
+from hls_utils import filter_by_configured_tiles, get_valid_range, setup_logging
+
+logger = setup_logging("11_outlier_gpkg")
 
 warnings.filterwarnings("ignore")
 
@@ -103,7 +105,7 @@ def iter_tile_chunks(nc_path, vi_type, vmin, vmax):
         if not crs_wkt and "spatial_ref" in ds.variables:
             crs_wkt = ds.variables["spatial_ref"].getncattr("spatial_ref")
         if not crs_wkt:
-            print(f"  WARN: No CRS found in {filename}. Skipping.")
+            logger.warning(f"No CRS found in {filename}. Skipping.")
             return
 
         time_vals   = ds.variables["time"][:]    # int32 days since 1970-01-01, shape (T,)
@@ -171,16 +173,18 @@ def main():
         raise ValueError("NETCDF_DIR or OUTLIER_GPKG_DIR not set.")
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    print("--- Step 11: Outlier GeoPackage Export ---")
-    print(f"VIs: {PROCESSED_VIS}  |  Time chunk: {TIME_CHUNK} slices")
+    logger.info("Step 11: Outlier GeoPackage Export")
+    logger.info(f"  VIs        : {PROCESSED_VIS}  |  Time chunk: {TIME_CHUNK} slices")
+    logger.info(f"  Input dir  : {INPUT_FOLDER}")
+    logger.info(f"  Output dir : {OUTPUT_FOLDER}")
     for vi in PROCESSED_VIS:
         vmin, vmax = get_valid_range(vi)
-        print(f"  Outlier threshold  {vi}: < {vmin} or > {vmax}")
+        logger.info(f"  Outlier threshold  {vi}: < {vmin} or > {vmax}")
 
     all_nc = glob.glob(os.path.join(INPUT_FOLDER, "**", "*.nc"), recursive=True)
     all_nc = filter_by_configured_tiles(all_nc)
     if not all_nc:
-        print(f"[ERROR] No NetCDF files found in: {INPUT_FOLDER}")
+        logger.error(f"No NetCDF files found in: {INPUT_FOLDER}")
         return
 
     for vi_type in PROCESSED_VIS:
@@ -190,14 +194,14 @@ def main():
             if vi_type in os.path.basename(nc_path)
         ]
         if not work_items:
-            print(f"\n  No NetCDF files matched for {vi_type}. Skipping.")
+            logger.warning(f"No NetCDF files matched for {vi_type}. Skipping.")
             continue
 
         out_path = os.path.join(OUTPUT_FOLDER, f"HLS_outliers_{vi_type}.gpkg")
         if os.path.exists(out_path):
             os.remove(out_path)
 
-        print(f"\nProcessing {vi_type}: {len(work_items)} file(s)")
+        logger.info(f"Processing {vi_type}: {len(work_items)} file(s)")
 
         total_outliers = 0
         n_tiles = len(work_items)
@@ -210,34 +214,33 @@ def main():
                 filename   = os.path.basename(nc_path)
                 n_tile_out = 0
 
-                print(f"  [{tile_idx}/{n_tiles}] {filename}", flush=True)
+                logger.info(f"  [{tile_idx}/{n_tiles}] {filename}")
 
                 try:
                     for chunk_features in iter_tile_chunks(nc_path, vi_type, vmin, vmax):
                         dst.writerecords(chunk_features)
                         n_tile_out += len(chunk_features)
                 except Exception as e:
-                    print(f"    ERROR: {e}", flush=True)
+                    logger.error(f"    {e}")
                     continue
 
                 total_outliers += n_tile_out
                 if n_tile_out > 0:
-                    print(
-                        f"    OK: {n_tile_out:,} outliers"
-                        f"  (running total: {total_outliers:,})",
-                        flush=True,
+                    logger.info(
+                        f"    {n_tile_out:,} outliers"
+                        f"  (running total: {total_outliers:,})"
                     )
                 else:
-                    print(f"    no outliers", flush=True)
+                    logger.info("    no outliers")
 
         if total_outliers > 0:
-            print(f"  Wrote: {out_path}  ({total_outliers:,} features)")
+            logger.info(f"Wrote: {out_path}  ({total_outliers:,} features)")
         else:
-            print(f"  No outliers found for {vi_type}.")
+            logger.info(f"No outliers found for {vi_type}.")
             if os.path.exists(out_path):
                 os.remove(out_path)
 
-    print("\nStep 11 complete.")
+    logger.info("Step 11 complete.")
 
 
 if __name__ == "__main__":

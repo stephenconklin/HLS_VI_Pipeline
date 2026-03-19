@@ -50,19 +50,27 @@ set -e
 set -o pipefail   # Propagate exit codes through pipes (e.g. python script | tee logfile)
 
 # -----------------------------------------------------------------
+# Log helpers — format aligns with Python steps 02–11
+#   2026-03-18 20:55:49  INFO      [pipeline]  message
+# -----------------------------------------------------------------
+log_info()  { echo "$(date '+%Y-%m-%d %H:%M:%S')  INFO      [pipeline]  $*"; }
+log_warn()  { echo "$(date '+%Y-%m-%d %H:%M:%S')  WARNING   [pipeline]  $*"; }
+log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S')  ERROR     [pipeline]  $*"; }
+
+# -----------------------------------------------------------------
 # 1. LOAD CONFIGURATION
 # -----------------------------------------------------------------
 if [ -f config.env ]; then
     set -a; source config.env; set +a
-    echo "Configuration loaded from config.env"
+    log_info "Configuration loaded from config.env"
 else
-    echo "Error: config.env not found."
+    log_error "config.env not found."
     exit 1
 fi
 
 if [ -f config.local.env ]; then
     set -a; source config.local.env; set +a
-    echo "Local overrides loaded from config.local.env"
+    log_info "Local overrides loaded from config.local.env"
 fi
 
 # -----------------------------------------------------------------
@@ -87,14 +95,14 @@ _check_bands() {
     done
 
     if [ -n "$missing" ]; then
-        echo "  [WARN] VI=${vi}, Sensor=${sensor}: missing band(s):${missing}"
-        echo "         Add$(echo $missing) to ${sensor}_BANDS in config.env"
+        log_warn "VI=${vi}, Sensor=${sensor}: missing band(s):${missing}"
+        log_warn "  Add$(echo $missing) to ${sensor}_BANDS in config.env"
         return 1
     fi
     return 0
 }
 
-echo "Validating band requirements for PROCESSED_VIS: ${PROCESSED_VIS}"
+log_info "Validating band requirements for PROCESSED_VIS: ${PROCESSED_VIS}"
 BAND_WARNINGS=0
 
 for vi in $PROCESSED_VIS; do
@@ -110,20 +118,19 @@ for vi in $PROCESSED_VIS; do
             _check_bands "S30" "$S30_BANDS" "$vi" "B8A B04 B02 Fmask" || BAND_WARNINGS=$((BAND_WARNINGS+1))
             ;;
         *)
-            echo "  [WARN] VI=${vi} is not recognised — no band requirements defined."
-            echo "         Supported VIs: NDVI EVI2 NIRv  (add EVI for 3-band EVI)"
+            log_warn "VI=${vi} is not recognised — no band requirements defined."
+            log_warn "  Supported VIs: NDVI EVI2 NIRv  (add EVI for 3-band EVI)"
             BAND_WARNINGS=$((BAND_WARNINGS+1))
             ;;
     esac
 done
 
 if [ "$BAND_WARNINGS" -eq 0 ]; then
-    echo "  Band requirements satisfied for all VIs."
+    log_info "Band requirements satisfied for all VIs."
 else
-    echo ""
-    echo "  ${BAND_WARNINGS} band warning(s) above. The pipeline will continue, but"
-    echo "  vi_calc (Step 02) may fail if required bands were not downloaded."
-    echo "  Fix the band lists in config.env before running Step 01 (download)."
+    log_warn "${BAND_WARNINGS} band warning(s) above. The pipeline will continue, but"
+    log_warn "  vi_calc (Step 02) may fail if required bands were not downloaded."
+    log_warn "  Fix the band lists in config.env before running Step 01 (download)."
 fi
 echo ""
 # -----------------------------------------------------------------
@@ -244,7 +251,7 @@ echo "================================================================="
     # ------------------------------------------------------------------
     if step_active "download"; then
         echo "" | tee -a "$LOGFILE"
-        echo "[Tile-by-tile] Phase 1: Calculating storage requirements..." | tee -a "$LOGFILE"
+        log_info "[Tile-by-tile] Phase 1: Calculating storage requirements..." | tee -a "$LOGFILE"
 
         TEMP_EST_TILE_FILE="./tiles_tbt_estimate.txt"
         echo "$HLS_TILES" | tr ' ' '\n' > "$TEMP_EST_TILE_FILE"
@@ -253,10 +260,10 @@ echo "================================================================="
         for range in $DOWNLOAD_CYCLES; do
             tbt_start=$(echo $range | cut -d'|' -f1)
             tbt_end=$(echo $range | cut -d'|' -f2)
-            echo -n "    Scanning $tbt_start to $tbt_end... " | tee -a "$LOGFILE"
+            log_info "Scanning $tbt_start to $tbt_end..." | tee -a "$LOGFILE"
             export HLS_MODE="estimate"
             tbt_count=$(./src/01_hls_download_query.sh "$TEMP_EST_TILE_FILE" "$tbt_start" "$tbt_end" "$RAW_HLS_DIR")
-            echo "$tbt_count granules." | tee -a "$LOGFILE"
+            log_info "  $tbt_count granules." | tee -a "$LOGFILE"
             TBT_TOTAL_GRANULES=$((TBT_TOTAL_GRANULES + tbt_count))
         done
         rm -f "$TEMP_EST_TILE_FILE"
@@ -423,17 +430,17 @@ echo "================================================================="
         } | tee -a "$LOGFILE"
 
         if [ "${SKIP_APPROVAL:-FALSE}" = "TRUE" ]; then
-            echo "[Approval skipped — SKIP_APPROVAL=TRUE]" | tee -a "$LOGFILE"
+            log_info "Approval skipped — SKIP_APPROVAL=TRUE" | tee -a "$LOGFILE"
         elif [ -c /dev/tty ]; then
             echo ">>> Proceed with download? (y/n)" > /dev/tty
             read -n 1 -r tbt_response < /dev/tty
             echo "" > /dev/tty
             if [[ ! $tbt_response =~ ^[Yy]$ ]]; then
-                echo "Aborted by user." | tee -a "$LOGFILE"
+                log_warn "Aborted by user." | tee -a "$LOGFILE"
                 exit 1
             fi
         else
-            echo "Error: Non-interactive shell. Set SKIP_APPROVAL=TRUE to bypass." | tee -a "$LOGFILE"
+            log_error "Non-interactive shell. Set SKIP_APPROVAL=TRUE to bypass." | tee -a "$LOGFILE"
             exit 1
         fi
     fi
@@ -449,13 +456,13 @@ echo "================================================================="
 
     for tbt_tile in $TBT_ORIG_TILES; do
         echo "" | tee -a "$LOGFILE"
-        echo "[Tile-by-tile] ====== Processing tile: $tbt_tile ======" | tee -a "$LOGFILE"
+        log_info "[Tile-by-tile] Processing tile: $tbt_tile" | tee -a "$LOGFILE"
         export HLS_TILES="$tbt_tile"
         TBT_TILE_OK=true
 
         # --- Step 01: Download this tile ---
         if step_active "download" && [ "$TBT_TILE_OK" = "true" ]; then
-            echo "[Step 01 | $tbt_tile] Downloading..." | tee -a "$LOGFILE"
+            log_info "[Step 01 | $tbt_tile] Downloading..." | tee -a "$LOGFILE"
             TBT_SINGLE_TILE_FILE="./tile_${tbt_tile}_active_run.txt"
             echo "$tbt_tile" > "$TBT_SINGLE_TILE_FILE"
             TBT_DL_OK=true
@@ -465,7 +472,7 @@ echo "================================================================="
                 export HLS_MODE="batch"
                 ./src/01_hls_download_query.sh "$TBT_SINGLE_TILE_FILE" "$tbt_start" "$tbt_end" "$RAW_HLS_DIR" 2>&1 | tee -a "$LOGFILE"
                 if [ ${PIPESTATUS[0]} -ne 0 ]; then
-                    echo "[ERROR][Step 01] Tile $tbt_tile failed on cycle $tbt_start. Skipping tile." | tee -a "$LOGFILE"
+                    log_error "[Step 01] Tile $tbt_tile failed on cycle $tbt_start. Skipping tile." | tee -a "$LOGFILE"
                     TBT_DL_OK=false
                     break
                 fi
@@ -476,20 +483,20 @@ echo "================================================================="
 
         # --- Step 02: VI calc for this tile ---
         if step_active "vi_calc" && [ "$TBT_TILE_OK" = "true" ]; then
-            echo "[Step 02 | $tbt_tile] Calculating VIs: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+            log_info "[Step 02 | $tbt_tile] Calculating VIs: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
             "$PYTHON_EXEC" src/02_hls_vi_calc.py 2>&1 | tee -a "$LOGFILE"
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
-                echo "[ERROR][Step 02] Tile $tbt_tile failed. Skipping tile." | tee -a "$LOGFILE"
+                log_error "[Step 02] Tile $tbt_tile failed. Skipping tile." | tee -a "$LOGFILE"
                 TBT_TILE_OK=false
             fi
         fi
 
         # --- Step 03: NetCDF for this tile ---
         if step_active "netcdf" && [ "$TBT_TILE_OK" = "true" ]; then
-            echo "[Step 03 | $tbt_tile] Building NetCDF..." | tee -a "$LOGFILE"
+            log_info "[Step 03 | $tbt_tile] Building NetCDF..." | tee -a "$LOGFILE"
             "$PYTHON_EXEC" src/03_hls_netcdf_build.py 2>&1 | tee -a "$LOGFILE"
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
-                echo "[ERROR][Step 03] Tile $tbt_tile failed. Skipping tile." | tee -a "$LOGFILE"
+                log_error "[Step 03] Tile $tbt_tile failed. Skipping tile." | tee -a "$LOGFILE"
                 TBT_TILE_OK=false
             fi
         fi
@@ -498,11 +505,11 @@ echo "================================================================="
         if [ "$TBT_TILE_OK" = "true" ] && step_active "netcdf"; then
             if [ "${SPACE_SAVER_REMOVE_RAW:-FALSE}" = "TRUE" ]; then
                 find "$RAW_HLS_DIR" -name "HLS.*.T${tbt_tile}.*.tif" -type f -delete
-                echo "[Space Saver] Deleted raw HLS files for tile $tbt_tile" | tee -a "$LOGFILE"
+                log_info "[Space Saver] Deleted raw HLS files for tile $tbt_tile" | tee -a "$LOGFILE"
             fi
             if [ "${SPACE_SAVER_REMOVE_VI:-FALSE}" = "TRUE" ]; then
                 find "$VI_OUTPUT_DIR" -name "HLS.*.T${tbt_tile}.*.tif" -type f -delete
-                echo "[Space Saver] Deleted VI GeoTIFFs for tile $tbt_tile" | tee -a "$LOGFILE"
+                log_info "[Space Saver] Deleted VI GeoTIFFs for tile $tbt_tile" | tee -a "$LOGFILE"
             fi
         fi
 
@@ -525,7 +532,7 @@ echo "================================================================="
     echo " Steps 01–03 complete."
     echo " Succeeded: $(echo $TBT_SUCCEEDED_TILES | tr ' ' '\n' | sort | tr '\n' ' ')"
     if [ -n "$TBT_FAILED_TILES" ]; then
-    echo " [WARN] Failed: $TBT_FAILED_TILES"
+    log_warn "Failed tiles: $TBT_FAILED_TILES"
     fi
     echo "-----------------------------------------------------------------"
     } | tee -a "$LOGFILE"
@@ -536,9 +543,9 @@ echo "================================================================="
 # -----------------------------------------------------------------
 if step_active "mean_flat"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 04 | mean_flat] Computing temporal means for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    log_info "[Step 04 | mean_flat] Computing temporal means for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" src/04_hls_mean_reproject.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 04] Complete." | tee -a "$LOGFILE"
+    log_info "[Step 04] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
@@ -546,9 +553,9 @@ fi
 # -----------------------------------------------------------------
 if step_active "outlier_flat"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 05 | outlier_flat] Extracting outliers for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    log_info "[Step 05 | outlier_flat] Extracting outliers for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" src/05_hls_outlier_reproject.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 05] Complete." | tee -a "$LOGFILE"
+    log_info "[Step 05] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
@@ -556,9 +563,9 @@ fi
 # -----------------------------------------------------------------
 if step_active "mean_mosaic"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 06 | mean_mosaic] Mosaicking mean tiles for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    log_info "[Step 06 | mean_mosaic] Mosaicking mean tiles for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" src/06_hls_mean_mosaic.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 06] Complete." | tee -a "$LOGFILE"
+    log_info "[Step 06] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
@@ -566,9 +573,9 @@ fi
 # -----------------------------------------------------------------
 if step_active "outlier_mosaic"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 07 | outlier_mosaic] Mosaicking outlier mean tiles..." | tee -a "$LOGFILE"
+    log_info "[Step 07 | outlier_mosaic] Mosaicking outlier mean tiles..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" src/07_hls_outlier_mean_mosaic.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 07] Complete." | tee -a "$LOGFILE"
+    log_info "[Step 07] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
@@ -576,9 +583,9 @@ fi
 # -----------------------------------------------------------------
 if step_active "outlier_counts"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 08 | outlier_counts] Mosaicking outlier count tiles..." | tee -a "$LOGFILE"
+    log_info "[Step 08 | outlier_counts] Mosaicking outlier count tiles..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" src/08_hls_outlier_count_mosaic.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 08] Complete." | tee -a "$LOGFILE"
+    log_info "[Step 08] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
@@ -586,9 +593,9 @@ fi
 # -----------------------------------------------------------------
 if step_active "count_valid_mosaic"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 09 | count_valid_mosaic] Building CountValid mosaic for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    log_info "[Step 09 | count_valid_mosaic] Building CountValid mosaic for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" src/09_hls_count_valid_mosaic.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 09] Complete." | tee -a "$LOGFILE"
+    log_info "[Step 09] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------
@@ -597,13 +604,13 @@ fi
 if step_active "timeseries"; then
     if [ "${TIMESLICE_ENABLED:-FALSE}" = "TRUE" ]; then
         echo "" | tee -a "$LOGFILE"
-        echo "[Step 10 | timeseries] Building time-series stacks for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
-        echo "[Step 10] Windows: ${TIMESLICE_WINDOWS}" | tee -a "$LOGFILE"
+        log_info "[Step 10 | timeseries] Building time-series stacks for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+        log_info "[Step 10] Windows: ${TIMESLICE_WINDOWS}" | tee -a "$LOGFILE"
         "$PYTHON_EXEC" src/10_hls_timeseries_mosaic.py 2>&1 | tee -a "$LOGFILE"
-        echo "[Step 10] Complete." | tee -a "$LOGFILE"
+        log_info "[Step 10] Complete." | tee -a "$LOGFILE"
     else
         echo "" | tee -a "$LOGFILE"
-        echo "[Step 10 | timeseries] Skipped — TIMESLICE_ENABLED is not TRUE." | tee -a "$LOGFILE"
+        log_warn "[Step 10 | timeseries] Skipped — TIMESLICE_ENABLED is not TRUE." | tee -a "$LOGFILE"
     fi
 fi
 
@@ -612,9 +619,9 @@ fi
 # -----------------------------------------------------------------
 if step_active "outlier_gpkg"; then
     echo "" | tee -a "$LOGFILE"
-    echo "[Step 11 | outlier_gpkg] Exporting outlier points to GeoPackage for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
+    log_info "[Step 11 | outlier_gpkg] Exporting outlier points to GeoPackage for: ${PROCESSED_VIS} ..." | tee -a "$LOGFILE"
     "$PYTHON_EXEC" src/11_hls_outlier_gpkg.py 2>&1 | tee -a "$LOGFILE"
-    echo "[Step 11] Complete." | tee -a "$LOGFILE"
+    log_info "[Step 11] Complete." | tee -a "$LOGFILE"
 fi
 
 # -----------------------------------------------------------------

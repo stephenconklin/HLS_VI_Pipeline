@@ -21,7 +21,9 @@ from pathlib import Path
 import multiprocessing as mp
 import warnings
 import glob
-from hls_utils import get_configured_tiles
+from hls_utils import get_configured_tiles, setup_logging
+
+logger = setup_logging("03_netcdf_build")
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -167,7 +169,7 @@ class HLSNetCDFAggregator:
         return None, None, None, None
 
     def merge_chunks(self, tile_id, vi_type, chunk_files):
-        print(f"    Merging {len(chunk_files)} chunks for {tile_id} {vi_type}...")
+        logger.info(f"  Merging {len(chunk_files)} chunks for {tile_id} {vi_type}...")
         
         merged_file = self.output_folder / f"{tile_id}_{vi_type}.nc"
 
@@ -247,10 +249,10 @@ class HLSNetCDFAggregator:
                 dst.title = f'HLS {vi_type} {tile_id}'
                 dst.crs = crs_wkt
             
-            print(f"    ✓ Merged file created: {merged_file.name}")
+            logger.info(f"  Merged: {merged_file.name}")
 
         except Exception as e:
-            print(f"    ✗ Merge failed: {e}")
+            logger.error(f"  Merge failed: {e}")
 
         finally:
             # Always clean up chunk files, regardless of merge success/failure
@@ -260,10 +262,9 @@ class HLSNetCDFAggregator:
 
     def collect_files(self):
         file_org = {}
-        print("Scanning for files recursively...")
-        # RECURSIVE SEARCH matches your new directory structure
+        logger.info("Scanning for VI GeoTIFF files recursively...")
         tif_files = list(self.input_folder.glob("**/*.tif"))
-        print(f"Found {len(tif_files)} total .tif files.")
+        logger.info(f"  Found {len(tif_files)} total .tif files.")
         
         for f in tif_files:
             sensor, tile_id, date, vi_type = self.extract_metadata_from_filename(f)
@@ -292,15 +293,15 @@ class HLSNetCDFAggregator:
 
     def run(self, chunk_size=10, n_workers=4):
         file_org = self.collect_files()
-        if not file_org: 
-            print("No matching files found.")
+        if not file_org:
+            logger.warning("No matching VI GeoTIFF files found.")
             return
 
         for tile_id in sorted(file_org.keys()):
-            print(f"\nProcessing Tile: {tile_id}")
+            logger.info(f"Processing tile: {tile_id}")
             for vi_type in sorted(file_org[tile_id].keys()):
                 files = file_org[tile_id][vi_type]
-                print(f"  {vi_type}: {len(files)} files")
+                logger.info(f"  {vi_type}: {len(files)} granules")
                 
                 # Get Spatial Ref from the first file
                 try:
@@ -333,11 +334,15 @@ class HLSNetCDFAggregator:
                             _south_epsg = _epsg + 100   # e.g. 32634 → 32734
                             crs_wkt = ProjCRS.from_epsg(_south_epsg).to_wkt()
                             y_coords = y_coords + 10_000_000.0
-                            print(f"  [CRS fix] {tile_id}: EPSG:{_epsg} + negative northings "
-                                  f"→ corrected to EPSG:{_south_epsg} (UTM South)")
+                            logger.info(
+                                f"[CRS] {tile_id}: southern hemisphere tile, remapped "
+                                f"EPSG:{_epsg} → EPSG:{_south_epsg} (UTM South)"
+                            )
                     except Exception as _crs_err:
-                        print(f"  [CRS fix] {tile_id}: hemisphere check failed ({_crs_err}) — "
-                              f"using original CRS unchanged")
+                        logger.warning(
+                            f"[CRS] {tile_id}: hemisphere check failed ({_crs_err}) — "
+                            f"using original CRS unchanged"
+                        )
 
                     # Create Chunks
                     chunks = []
@@ -363,7 +368,11 @@ class HLSNetCDFAggregator:
                     with mp.Pool(n_workers) as pool:
                         results = pool.map(process_netcdf_chunk, chunks)
                     
-                    for r in results: print(f"    {r}")
+                    for r in results:
+                        if r.startswith('✗'):
+                            logger.error(f"  {r}")
+                        else:
+                            logger.info(f"  {r}")
                     
                     # Merge if necessary
                     if total_chunks > 1:
@@ -375,7 +384,7 @@ class HLSNetCDFAggregator:
                         self.merge_chunks(tile_id, vi_type, expected_chunks)
                         
                 except Exception as e:
-                    print(f"  Error preparing tile {tile_id}: {e}")
+                    logger.error(f"Error preparing tile {tile_id}: {e}")
 
 if __name__ == "__main__":
     # --- CONFIGURATION FROM ENV ---
@@ -392,7 +401,7 @@ if __name__ == "__main__":
         chunk_size = 10
 
     if not input_folder or not netcdf_output_folder:
-        print("Error: Config not loaded. Ensure VI_OUTPUT_DIR and NETCDF_DIR are set.")
+        logger.error("Config not loaded. Ensure VI_OUTPUT_DIR and NETCDF_DIR are set.")
         exit(1)
 
     try:
@@ -400,9 +409,12 @@ if __name__ == "__main__":
     except ValueError:
         netcdf_complevel = 1
 
-    print(f"HLS NetCDF Aggregation (Indices: {processed_vis})")
-    print(f"Workers: {n_workers} | Chunk Size: {chunk_size} | NetCDF complevel: {netcdf_complevel}")
-    
+    logger.info("Step 03: NetCDF Aggregation")
+    logger.info(f"  VIs          : {processed_vis}")
+    logger.info(f"  Workers      : {n_workers}  |  Chunk size: {chunk_size}  |  complevel: {netcdf_complevel}")
+    logger.info(f"  Input dir    : {input_folder}")
+    logger.info(f"  Output dir   : {netcdf_output_folder}")
+
     aggregator = HLSNetCDFAggregator(input_folder, netcdf_output_folder, wanted_vis=processed_vis)
     aggregator.run(chunk_size=chunk_size, n_workers=n_workers)
-    print("NetCDF Creation Complete.")
+    logger.info("Step 03 complete.")

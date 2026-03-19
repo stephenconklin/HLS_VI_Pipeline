@@ -25,7 +25,9 @@ import glob
 import warnings
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution, setup_logging
+
+logger = setup_logging("05_outlier_reproject")
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -128,16 +130,18 @@ def process_file(args):
 
 
 def main():
-    print(f"--- Step 05: Outlier Extraction + Reproject to {TARGET_CRS} ---")
-    print(f"VIs: {PROCESSED_VIS}  |  Workers: {N_WORKERS}")
+    logger.info(f"Step 05: Outlier Extraction + Reproject to {TARGET_CRS}")
+    logger.info(f"  VIs        : {PROCESSED_VIS}  |  Workers: {N_WORKERS}")
+    logger.info(f"  Input dir  : {INPUT_FOLDER}")
+    logger.info(f"  Output dir : {OUTPUT_FOLDER}")
     for vi in PROCESSED_VIS:
         vmin, vmax = get_valid_range(vi)
-        print(f"  Outlier threshold  {vi}: < {vmin} or > {vmax}")
+        logger.info(f"  Outlier threshold  {vi}: < {vmin} or > {vmax}")
 
     all_nc_files = glob.glob(os.path.join(INPUT_FOLDER, "**", "*.nc"), recursive=True)
     all_nc_files = filter_by_configured_tiles(all_nc_files)
     if not all_nc_files:
-        print(f"[ERROR] No NetCDF files found in: {INPUT_FOLDER}")
+        logger.error(f"No NetCDF files found in: {INPUT_FOLDER}")
         return
 
     # Build (nc_path, vi_type) work items — match each file to its VI by name
@@ -149,11 +153,10 @@ def main():
                 work_items.append((nc_path, vi))
                 break
 
-    print(f"Found {len(all_nc_files)} NetCDF files → {len(work_items)} work items "
-          f"across {PROCESSED_VIS}.")
+    logger.info(f"Found {len(all_nc_files)} NetCDF file(s) → {len(work_items)} work item(s).")
 
     if not work_items:
-        print("No matching files. Check PROCESSED_VIS and NETCDF_DIR.")
+        logger.warning("No matching files. Check PROCESSED_VIS and NETCDF_DIR.")
         return
 
     completed, total = 0, len(work_items)
@@ -164,11 +167,15 @@ def main():
             result = future.result()
             if result.startswith("OK"):
                 if completed % 5 == 0 or completed == total:
-                    print(f"  [{completed}/{total}] {result}")
+                    logger.info(f"  [{completed}/{total}] {result}")
+            elif result.startswith("Skipped"):
+                logger.info(f"  [{completed}/{total}] {result}")
+            elif result.startswith("WARNING"):
+                logger.warning(f"  [{completed}/{total}] {result}")
             else:
-                print(f"  [{completed}/{total}] {result}")
+                logger.error(f"  [{completed}/{total}] {result}")
 
-    print(f"Step 05 complete. Processed {total} work items.")
+    logger.info(f"Step 05 complete. Processed {total} work item(s).")
 
 
 if __name__ == "__main__":

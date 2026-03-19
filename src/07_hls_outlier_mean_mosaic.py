@@ -18,7 +18,9 @@ from rasterio.merge import merge as rasterio_merge
 import os
 import glob
 import numpy as np
-from hls_utils import filter_by_configured_tiles
+from hls_utils import filter_by_configured_tiles, setup_logging
+
+logger = setup_logging("07_outlier_mean_mosaic")
 
 # --- CONFIGURATION FROM ENV ---
 INPUT_FOLDER  = os.environ.get("REPROJECTED_DIR_OUTLIERS", "")
@@ -45,17 +47,17 @@ def mosaic_outlier_mean(vi_type):
                                f"HLS_Mosaic_Outlier_Mean_{vi_type}_{safe_crs}.tif")
 
     if not tif_files:
-        print(f"  [{vi_type}] No outlier mean tiles found — skipping.")
-        print(f"             Pattern: {pattern}")
+        logger.warning(f"[{vi_type}] No outlier mean tiles found — skipping.")
+        logger.warning(f"           Pattern: {pattern}")
         return
 
     if os.path.exists(output_file):
-        print(f"  [{vi_type}] Mosaic already exists — skipping: "
-              f"{os.path.basename(output_file)}")
+        logger.info(f"[{vi_type}] Mosaic already exists — skipping: "
+                    f"{os.path.basename(output_file)}")
         return
 
-    print(f"  [{vi_type}] Merging {len(tif_files)} tile(s) → "
-          f"{os.path.basename(output_file)}")
+    logger.info(f"[{vi_type}] Merging {len(tif_files)} tile(s) → "
+                f"{os.path.basename(output_file)}")
 
     src_files = []
     try:
@@ -82,10 +84,10 @@ def mosaic_outlier_mean(vi_type):
         with rasterio.open(output_file, 'w', **profile) as dst:
             dst.write(mosaic[0], 1)
 
-        print(f"  [{vi_type}] ✓ Written: {os.path.basename(output_file)}")
+        logger.info(f"[{vi_type}] Written: {os.path.basename(output_file)}")
 
     except Exception as e:
-        print(f"  [{vi_type}] ✗ Error: {e}")
+        logger.error(f"[{vi_type}] Error: {e}")
         raise
 
     finally:
@@ -94,11 +96,13 @@ def mosaic_outlier_mean(vi_type):
 
 
 def main():
-    print(f"--- Step 07: Outlier Mean Mosaic  |  Target CRS: {TARGET_CRS} ---")
-    print(f"VIs to mosaic: {PROCESSED_VIS}")
+    logger.info(f"Step 07: Outlier Mean Mosaic  |  Target CRS: {TARGET_CRS}")
+    logger.info(f"  VIs        : {PROCESSED_VIS}")
+    logger.info(f"  Input dir  : {INPUT_FOLDER}")
+    logger.info(f"  Output dir : {MOSAIC_DIR}")
     for vi in PROCESSED_VIS:
         mosaic_outlier_mean(vi)
-    print("Step 07 complete.")
+    logger.info("Step 07 complete.")
 
 
 if __name__ == "__main__":

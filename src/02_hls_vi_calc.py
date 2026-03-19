@@ -21,7 +21,9 @@ import glob
 from pathlib import Path
 import multiprocessing as mp
 import warnings
-from hls_utils import filter_by_configured_tiles
+from hls_utils import filter_by_configured_tiles, setup_logging
+
+logger = setup_logging("02_vi_calc")
 
 # Suppress "NotGeoreferencedWarning" which can be spammy with HLS data
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
@@ -54,12 +56,12 @@ class HLSProcessor:
         
     def find_granules(self, base_dir, product_type):
         granules = []
-        print(f"Scanning {product_type} directory recursively...")
+        logger.info(f"Scanning {product_type} directory recursively...")
         search_pattern = os.path.join(base_dir, "**", "*Fmask.tif")
         fmask_files = glob.glob(search_pattern, recursive=True)
         fmask_files = filter_by_configured_tiles(fmask_files)
 
-        print(f"  Found {len(fmask_files)} {product_type} granules.")
+        logger.info(f"  Found {len(fmask_files)} {product_type} granules.")
         
         for fmask_path in fmask_files:
             folder = os.path.dirname(fmask_path)
@@ -183,21 +185,21 @@ class HLSProcessor:
         s30_granules = self.find_granules(self.s30_dir, 'S30')
         all_granules = l30_granules + s30_granules
         
-        print(f"Total granules found: {len(all_granules)}")
-        
+        logger.info(f"Total granules found: {len(all_granules)}")
+
         if not all_granules:
-            print("No granules found.")
+            logger.warning("No granules found.")
             return
 
-        print(f"Starting pool with {n_workers} workers...")
+        logger.info(f"Starting pool with {n_workers} workers...")
         with mp.Pool(processes=n_workers) as pool:
             results = pool.imap_unordered(self.process_granule_static, all_granules, chunksize=chunk_size)
             count = 0
             for res in results:
                 count += 1
-                if count % 10 == 0: print(f"[{count}/{len(all_granules)}] {res}")
-                elif "Error"   in res: print(f"[ERROR]   {res}")
-                elif "Skipped" in res: print(f"[SKIPPED] {res}")
+                if count % 10 == 0:    logger.info(f"  [{count}/{len(all_granules)}] {res}")
+                elif "Error"   in res: logger.error(f"  [{count}/{len(all_granules)}] {res}")
+                elif "Skipped" in res: logger.info(f"  [{count}/{len(all_granules)}] {res}")
 
 if __name__ == "__main__":
     try: mp.set_start_method('fork', force=True)
@@ -208,7 +210,7 @@ if __name__ == "__main__":
     processed_vis = os.environ.get("PROCESSED_VIS", "NDVI EVI2 NIRv").split()
     
     if not base_dir or not output_folder:
-        print("Error: Config not loaded.")
+        logger.error("Config not loaded. Ensure RAW_HLS_DIR and VI_OUTPUT_DIR are set.")
         exit(1)
 
     try:
@@ -219,10 +221,13 @@ if __name__ == "__main__":
 
     s30_folder = os.path.join(base_dir, "S30")
     l30_folder = os.path.join(base_dir, "L30")
-    
-    print(f"Processing VIs: {processed_vis}")
-    print(f"Aerosol Mode: {os.environ.get('MASK_AEROSOL_MODE', 'HIGH')}")
-    
+
+    logger.info("Step 02: VI Calculation")
+    logger.info(f"  VIs          : {processed_vis}")
+    logger.info(f"  Aerosol mode : {os.environ.get('MASK_AEROSOL_MODE', 'HIGH')}")
+    logger.info(f"  Workers      : {n_workers}")
+    logger.info(f"  Output dir   : {output_folder}")
+
     processor = HLSProcessor(s30_folder, l30_folder, output_folder, wanted_vis=processed_vis)
     processor.process_all_data_parallel(n_workers=n_workers, chunk_size=chunk_size)
-    print("VI Processing Complete.")
+    logger.info("Step 02 complete.")
