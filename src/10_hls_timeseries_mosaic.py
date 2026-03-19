@@ -37,7 +37,9 @@ import rasterio
 from rasterio.merge import merge as rasterio_merge
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution, setup_logging
+
+logger = setup_logging("10_timeseries")
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -315,17 +317,16 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
     all_nc = glob.glob(os.path.join(NETCDF_DIR, "**", "*.nc"), recursive=True)
     all_nc = filter_by_configured_tiles(all_nc)
     if not all_nc:
-        print(f"[ERROR] No NetCDF files found in {NETCDF_DIR}")
+        logger.error(f"No NetCDF files found in {NETCDF_DIR}")
         return
 
-    print(f"Found {len(all_nc)} NetCDF files across all tiles/VIs.")
-    print(f"Windows: {[w['label'] for w in windows]}")
-    print(f"VIs:     {processed_vis}")
-    print(f"Stat:    {TIMESLICE_STAT}  |  Workers: {N_WORKERS}")
+    logger.info(f"Found {len(all_nc)} NetCDF file(s) across all tiles/VIs.")
+    logger.info(f"  Windows : {[w['label'] for w in windows]}")
+    logger.info(f"  VIs     : {processed_vis}")
+    logger.info(f"  Stat    : {TIMESLICE_STAT}  |  Workers: {N_WORKERS}")
     for vi in processed_vis:
         vmin, vmax = get_valid_range(vi)
-        print(f"  Valid range  {vi}: [{vmin}, {vmax}]")
-    print()
+        logger.info(f"  Valid range  {vi}: [{vmin}, {vmax}]")
 
     for vi in processed_vis:
         mean_stack_path  = os.path.join(OUTPUT_DIR, f"HLS_TimeSeries_{vi}_Mean_{safe_crs}.tif")
@@ -333,25 +334,25 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
 
         vi_nc_files = [f for f in all_nc if vi in os.path.basename(f)]
         if not vi_nc_files:
-            print(f"[{vi}] No NetCDF files found — skipping.")
+            logger.warning(f"[{vi}] No NetCDF files found — skipping.")
             continue
 
-        print(f"[{vi}] {len(vi_nc_files)} tile file(s)  →  {len(windows)} window(s)")
-        print(f"[{vi}] Mean stack:  {os.path.basename(mean_stack_path)}")
-        print(f"[{vi}] Count stack: {os.path.basename(count_stack_path)}")
+        logger.info(f"[{vi}] {len(vi_nc_files)} tile file(s)  →  {len(windows)} window(s)")
+        logger.info(f"[{vi}] Mean stack  : {os.path.basename(mean_stack_path)}")
+        logger.info(f"[{vi}] Count stack : {os.path.basename(count_stack_path)}")
 
         # Remove any stale partial stacks so we always build fresh
         for p in [mean_stack_path, count_stack_path]:
             if os.path.exists(p):
-                print(f"  [!] Removing existing stack: {os.path.basename(p)}")
+                logger.warning(f"  Removing existing stack: {os.path.basename(p)}")
                 os.remove(p)
 
         for w_idx, window in enumerate(windows, 1):
             label = window['label']
             start = window['start']
             end   = window['end']
-            print(f"  [{vi}] Window {w_idx}/{len(windows)}: {label}  "
-                  f"({start.date()} – {end.date()})")
+            logger.info(f"  [{vi}] Window {w_idx}/{len(windows)}: {label}  "
+                        f"({start.date()} – {end.date()})")
 
             with tempfile.TemporaryDirectory(prefix=f"hls_{vi}_{label}_") as tmp_dir:
                 worker_args = [
@@ -378,17 +379,17 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
                             count_tile_paths.append(result['count_path'])
                         elif result['status'] == 'skip':
                             n_skipped += 1
-                            print(f"    [skip] {result['message']}")
+                            logger.info(f"    skip  {result['message']}")
                         else:
                             n_errors += 1
-                            print(f"    [error] {result['message']}")
+                            logger.error(f"    error {result['message']}")
 
                 if not mean_tile_paths:
-                    print(f"    [!] No tiles produced for window '{label}' — skipping band.")
+                    logger.warning(f"    No tiles produced for window '{label}' — skipping band.")
                     continue
 
-                print(f"    Mosaicking {len(mean_tile_paths)} tile(s) "
-                      f"({n_skipped} skipped, {n_errors} errors)...")
+                logger.info(f"    Mosaicking {len(mean_tile_paths)} tile(s) "
+                            f"({n_skipped} skipped, {n_errors} errors)...")
 
                 try:
                     mean_mosaic, transform, crs = _mosaic_temp_tiles(
@@ -398,9 +399,9 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
                         mean_stack_path, mean_mosaic, transform, crs,
                         band_label=label, dtype='float32', nodata=np.nan, predictor=3
                     )
-                    print(f"    ✓ Mean band {band_num} written: '{label}'")
+                    logger.info(f"    Mean band {band_num} written: '{label}'")
                 except Exception as e:
-                    print(f"    ✗ Mean mosaic failed for '{label}': {e}")
+                    logger.error(f"    Mean mosaic failed for '{label}': {e}")
                     continue
 
                 try:
@@ -411,9 +412,9 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
                         count_stack_path, count_mosaic, transform, crs,
                         band_label=label, dtype='uint16', nodata=0, predictor=2
                     )
-                    print(f"    ✓ CountValid band {band_num} written: '{label}'")
+                    logger.info(f"    CountValid band {band_num} written: '{label}'")
                 except Exception as e:
-                    print(f"    ✗ Count mosaic failed for '{label}': {e}")
+                    logger.error(f"    Count mosaic failed for '{label}': {e}")
 
         # Final stack summary
         for stack_path, stack_name in [(mean_stack_path, "Mean"),
@@ -423,10 +424,9 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
                     bands = src.count
                     descs = [src.descriptions[i] or f"band_{i+1}" for i in range(bands)]
                 size_mb = os.path.getsize(stack_path) / (1024 ** 2)
-                print(f"\n  [{vi}] {stack_name} stack: {bands} band(s), {size_mb:.1f} MB")
+                logger.info(f"[{vi}] {stack_name} stack: {bands} band(s), {size_mb:.1f} MB")
                 for i, d in enumerate(descs, 1):
-                    print(f"    Band {i:2d}: {d}")
-        print()
+                    logger.info(f"    Band {i:2d}: {d}")
 
 
 # =============================================================================
@@ -434,28 +434,26 @@ def build_timeseries_stacks(windows: list, processed_vis: list):
 # =============================================================================
 
 def main():
-    print("=" * 65)
-    print(" Step 10: Custom Time-Window VI Mosaic Stacks")
-    print("=" * 65)
+    logger.info("Step 10: Custom Time-Window VI Mosaic Stacks")
+    logger.info(f"  NetCDF dir : {NETCDF_DIR}")
+    logger.info(f"  Output dir : {OUTPUT_DIR}")
+    logger.info(f"  CRS        : {TARGET_CRS}")
 
     try:
         windows = parse_windows(_WINDOWS_RAW)
     except ValueError as e:
-        print(f"[ERROR] {e}")
+        logger.error(str(e))
         exit(1)
 
-    print(f"Parsed {len(windows)} window(s):")
+    logger.info(f"Parsed {len(windows)} window(s):")
     for w in windows:
         n_days = (w['end'] - w['start']).days + 1
-        print(f"  {w['label']:30s}  {w['start'].date()} – {w['end'].date()}  ({n_days} days)")
-    print()
+        logger.info(f"  {w['label']:30s}  {w['start'].date()} – {w['end'].date()}  ({n_days} days)")
 
     build_timeseries_stacks(windows, PROCESSED_VIS)
 
-    print("=" * 65)
-    print(" Step 10 complete.")
-    print(f" Output directory: {OUTPUT_DIR}")
-    print("=" * 65)
+    logger.info("Step 10 complete.")
+    logger.info(f"  Output directory: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

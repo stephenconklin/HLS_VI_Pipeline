@@ -9,7 +9,49 @@
 #          https://github.com/stephenconklin
 # License: MIT
 
+import logging
 import os
+import sys
+
+
+# Module-level logger — used for warnings emitted by utility functions.
+# Handlers are added by the calling script via setup_logging(); in worker
+# processes (no handlers configured) Python's lastResort handler writes
+# WARNING+ to stderr, which the pipeline captures via 2>&1 | tee.
+_logger = logging.getLogger('hls_utils')
+
+
+# ---------------------------------------------------------------------------
+# Logging setup — called once per script at module level
+# ---------------------------------------------------------------------------
+
+def setup_logging(step_name: str) -> logging.Logger:
+    """Configure the root logger and return a named logger for a pipeline step.
+
+    Must be called at module level in each pipeline script so that all log
+    output (including warnings from hls_utils helper functions) is formatted
+    consistently.  Guards against duplicate handlers so it is safe to call
+    in child processes spawned by ProcessPoolExecutor.
+
+    Format (matches VI_Phenology style):
+        2026-03-18 20:55:49  INFO      [04_mean_reproject]  message text
+
+    Args:
+        step_name: Short label used as the logger name, e.g. '04_mean_reproject'.
+
+    Returns:
+        logging.Logger named *step_name*.
+    """
+    root = logging.getLogger()
+    if not root.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter(
+            fmt='%(asctime)s  %(levelname)-8s  [%(name)s]  %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S',
+        ))
+        root.setLevel(logging.DEBUG)
+        root.addHandler(handler)
+    return logging.getLogger(step_name)
 
 
 # ---------------------------------------------------------------------------
@@ -89,8 +131,10 @@ def get_valid_range(vi_type: str) -> tuple:
             parts = raw.split(",")
             return float(parts[0]), float(parts[1])
         except (ValueError, IndexError):
-            print(f"  [WARN] Could not parse VALID_RANGE_{vi_type}='{raw}'. "
-                  f"Using default {defaults.get(vi_type, (-1.0, 1.0))}.")
+            _logger.warning(
+                f"Could not parse VALID_RANGE_{vi_type}='{raw}'. "
+                f"Using default {defaults.get(vi_type, (-1.0, 1.0))}."
+            )
     return defaults.get(vi_type, (-1.0, 1.0))
 
 
@@ -115,8 +159,8 @@ def reproject_resolution(target_crs: str, meters: float = 30.0) -> float:
     crs = ProjCRS.from_user_input(target_crs)
     if crs.is_geographic:
         deg = meters / 111_320.0
-        print(
-            f"  [WARN] TARGET_CRS '{target_crs}' is a geographic CRS (units: degrees). "
+        _logger.warning(
+            f"TARGET_CRS '{target_crs}' is a geographic CRS (units: degrees). "
             f"Resolution converted from {meters} m to ≈{deg:.6f}°. "
             f"A projected CRS (metres) is strongly recommended for pixel-level VI analysis."
         )

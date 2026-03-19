@@ -34,7 +34,9 @@ import rioxarray         # noqa: F401 — activates .rio accessor
 import rasterio
 from rasterio.merge import merge as rasterio_merge
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution
+from hls_utils import filter_by_configured_tiles, get_valid_range, detect_crs, reproject_resolution, setup_logging
+
+logger = setup_logging("09_count_valid")
 
 warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
@@ -153,16 +155,15 @@ def build_count_valid_mosaic(processed_vis: list):
     all_nc = glob.glob(os.path.join(NETCDF_DIR, "**", "*.nc"), recursive=True)
     all_nc = filter_by_configured_tiles(all_nc)
     if not all_nc:
-        print(f"[ERROR] No NetCDF files found in {NETCDF_DIR}")
+        logger.error(f"No NetCDF files found in {NETCDF_DIR}")
         return
 
-    print(f"Found {len(all_nc)} NetCDF files across all tiles/VIs.")
-    print(f"VIs:     {processed_vis}")
-    print(f"Workers: {N_WORKERS}")
+    logger.info(f"Found {len(all_nc)} NetCDF file(s) across all tiles/VIs.")
+    logger.info(f"  VIs     : {processed_vis}")
+    logger.info(f"  Workers : {N_WORKERS}")
     for vi in processed_vis:
         vmin, vmax = get_valid_range(vi)
-        print(f"  Valid range  {vi}: [{vmin}, {vmax}]")
-    print()
+        logger.info(f"  Valid range  {vi}: [{vmin}, {vmax}]")
 
     for vi in processed_vis:
         output_path = os.path.join(MOSAIC_DIR,
@@ -170,16 +171,16 @@ def build_count_valid_mosaic(processed_vis: list):
 
         vi_nc_files = [f for f in all_nc if vi in os.path.basename(f)]
         if not vi_nc_files:
-            print(f"[{vi}] No NetCDF files found — skipping.")
+            logger.warning(f"[{vi}] No NetCDF files found — skipping.")
             continue
 
         if os.path.exists(output_path):
-            print(f"[{vi}] Output already exists — skipping: "
-                  f"{os.path.basename(output_path)}")
+            logger.info(f"[{vi}] Output already exists — skipping: "
+                        f"{os.path.basename(output_path)}")
             continue
 
-        print(f"[{vi}] {len(vi_nc_files)} tile file(s)  →  "
-              f"{os.path.basename(output_path)}")
+        logger.info(f"[{vi}] {len(vi_nc_files)} tile file(s)  →  "
+                    f"{os.path.basename(output_path)}")
 
         with tempfile.TemporaryDirectory(prefix=f"hls_{vi}_countvalid_") as tmp_dir:
             worker_args = [
@@ -203,20 +204,20 @@ def build_count_valid_mosaic(processed_vis: list):
                     result = future.result()
                     if result['status'] == 'ok':
                         count_tile_paths.append(result['count_path'])
-                        print(f"  [{n_done}/{n_total}] ✓ {result['message']}", flush=True)
+                        logger.info(f"  [{n_done}/{n_total}] {result['message']}")
                     elif result['status'] == 'skip':
                         n_skipped += 1
-                        print(f"  [{n_done}/{n_total}] skip  {result['message']}", flush=True)
+                        logger.info(f"  [{n_done}/{n_total}] skip  {result['message']}")
                     else:
                         n_errors += 1
-                        print(f"  [{n_done}/{n_total}] error {result['message']}", flush=True)
+                        logger.error(f"  [{n_done}/{n_total}] error {result['message']}")
 
             if not count_tile_paths:
-                print(f"  [!] No tiles produced for {vi} — skipping mosaic.")
+                logger.warning(f"  No tiles produced for {vi} — skipping mosaic.")
                 continue
 
-            print(f"  Mosaicking {len(count_tile_paths)} tile(s) "
-                  f"({n_skipped} skipped, {n_errors} errors)...")
+            logger.info(f"  Mosaicking {len(count_tile_paths)} tile(s) "
+                        f"({n_skipped} skipped, {n_errors} errors)...")
 
             try:
                 mosaic, transform, crs = _mosaic_tiles(
@@ -242,11 +243,10 @@ def build_count_valid_mosaic(processed_vis: list):
                     dst.set_band_description(1, "CountValid_AllDownloadCycles")
 
                 size_mb = os.path.getsize(output_path) / (1024 ** 2)
-                print(f"  [{vi}] ✓ Written: {os.path.basename(output_path)}"
-                      f"  ({size_mb:.1f} MB)")
+                logger.info(f"[{vi}] Written: {os.path.basename(output_path)}"
+                            f"  ({size_mb:.1f} MB)")
             except Exception as e:
-                print(f"  [{vi}] ✗ Mosaic failed: {e}")
-        print()
+                logger.error(f"[{vi}] Mosaic failed: {e}")
 
 
 # =============================================================================
@@ -254,20 +254,15 @@ def build_count_valid_mosaic(processed_vis: list):
 # =============================================================================
 
 def main():
-    print("=" * 65)
-    print(" Step 09: CountValid Mosaic (All Download Cycles)")
-    print("=" * 65)
-    print(f"NetCDF dir: {NETCDF_DIR}")
-    print(f"Mosaic dir: {MOSAIC_DIR}")
-    print(f"CRS:        {TARGET_CRS}")
-    print()
+    logger.info("Step 09: CountValid Mosaic (All Download Cycles)")
+    logger.info(f"  NetCDF dir : {NETCDF_DIR}")
+    logger.info(f"  Mosaic dir : {MOSAIC_DIR}")
+    logger.info(f"  CRS        : {TARGET_CRS}")
 
     build_count_valid_mosaic(PROCESSED_VIS)
 
-    print("=" * 65)
-    print(" Step 09 complete.")
-    print(f" Output directory: {MOSAIC_DIR}")
-    print("=" * 65)
+    logger.info("Step 09 complete.")
+    logger.info(f"  Output directory: {MOSAIC_DIR}")
 
 
 if __name__ == "__main__":
