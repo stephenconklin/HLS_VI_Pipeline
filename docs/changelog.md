@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2026-03-18 (4)
+
+### Fixed
+- **Root logger level `DEBUG` → `INFO`** — `setup_logging()` in `hls_utils.py` set the
+  root logger to `DEBUG`, causing rasterio and GDAL internal trace messages to flood the
+  log (thousands of `DEBUG [rasterio.env]` / `DEBUG [rasterio._io]` lines per run).
+  Changed to `INFO` so only pipeline-level messages and library `WARNING`+ output appear.
+- **Steps 04/05: `"Skipped"` results logged at `ERROR`** — the result-dispatch logic in
+  the main loop of steps 04 and 05 routed any string not starting with `"OK"` or
+  `"WARNING"` to `logger.error`. `"Skipped (Exists)"` (step 04) and
+  `"Skipped (No outliers)"` (step 05) both fell into this branch. Added an explicit
+  `Skipped` prefix check → `logger.info` before the error fallthrough.
+- **Steps 09/10: `BLOCKXSIZE` without `TILED=YES` in temp tile writes** — `to_raster()`
+  calls for intermediate temp GeoTIFFs in steps 09 and 10 passed `blockxsize`/`blockysize`
+  without `tiled=True`, producing GDAL `CPLE_IllegalArg` warnings on every tile. Added
+  `tiled=True` to all three affected `to_raster()` calls.
+- **Step 09: dask chunk mismatch `UserWarning`** — `xr.open_dataset(nc_path, chunks={'time': 10})`
+  produced a dask performance warning when the on-disk NetCDF chunk layout differed from
+  the requested chunking. Changed to `chunks='auto'` to align with on-disk layout,
+  consistent with how steps 04, 05, and 10 open datasets.
+- **Step 03: CRS remap log message rewording** — the southern hemisphere CRS adjustment
+  log line used `[CRS fix]` and `corrected to`, implying an error condition. Replaced
+  with `[CRS]` and `southern hemisphere tile, remapped … → …` to reflect that this is
+  routine, expected processing for any southern hemisphere tile.
+
+---
+
 ## 2026-03-18 (3)
 
 ### Added
