@@ -335,12 +335,12 @@ class HLSNetCDFAggregator:
                             crs_wkt = ProjCRS.from_epsg(_south_epsg).to_wkt()
                             y_coords = y_coords + 10_000_000.0
                             logger.info(
-                            f"[CRS fix] {tile_id}: EPSG:{_epsg} + negative northings "
-                            f"→ corrected to EPSG:{_south_epsg} (UTM South)"
-                        )
+                                f"[CRS] {tile_id}: southern hemisphere tile, remapped "
+                                f"EPSG:{_epsg} → EPSG:{_south_epsg} (UTM South)"
+                            )
                     except Exception as _crs_err:
                         logger.warning(
-                            f"[CRS fix] {tile_id}: hemisphere check failed ({_crs_err}) — "
+                            f"[CRS] {tile_id}: hemisphere check failed ({_crs_err}) — "
                             f"using original CRS unchanged"
                         )
 
