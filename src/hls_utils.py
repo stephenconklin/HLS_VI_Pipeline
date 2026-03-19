@@ -122,7 +122,7 @@ def get_valid_range(vi_type: str) -> tuple:
     Format:      "min,max"  e.g. "-1,1"
 
     Falls back to conservative per-VI defaults when the variable is absent or
-    cannot be parsed, and prints a warning in that case.
+    cannot be parsed, and logs a warning in that case.
     """
     defaults = {"NDVI": (-1.0, 1.0), "EVI2": (-1.0, 2.0), "NIRv": (-0.5, 1.0)}
     raw = os.environ.get(f"VALID_RANGE_{vi_type}", "")
@@ -148,7 +148,7 @@ def reproject_resolution(target_crs: str, meters: float = 30.0) -> float:
 
     For projected CRS (linear units, e.g. metres) returns ``meters`` unchanged.
     For geographic CRS (angular units, e.g. degrees) converts to decimal degrees
-    using an equatorial approximation (1° ≈ 111 320 m) and prints a warning,
+    using an equatorial approximation (1° ≈ 111 320 m) and logs a warning,
     since geographic CRS is generally not recommended for pixel-level VI analysis.
 
     Args:

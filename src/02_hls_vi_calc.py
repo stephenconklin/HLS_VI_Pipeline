@@ -222,7 +222,7 @@ if __name__ == "__main__":
     s30_folder = os.path.join(base_dir, "S30")
     l30_folder = os.path.join(base_dir, "L30")
 
-    logger.info(f"Step 02: VI Calculation")
+    logger.info("Step 02: VI Calculation")
     logger.info(f"  VIs          : {processed_vis}")
     logger.info(f"  Aerosol mode : {os.environ.get('MASK_AEROSOL_MODE', 'HIGH')}")
     logger.info(f"  Workers      : {n_workers}")

@@ -231,7 +231,7 @@ def main():
                         f"  (running total: {total_outliers:,})"
                     )
                 else:
-                    logger.info(f"    no outliers")
+                    logger.info("    no outliers")
 
         if total_outliers > 0:
             logger.info(f"Wrote: {out_path}  ({total_outliers:,} features)")
