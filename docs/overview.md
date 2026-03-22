@@ -235,6 +235,19 @@ python -c "import numpy, pandas, rasterio, netCDF4, xarray, rioxarray, dask, fio
 
 All pipeline parameters are set in `config.env`. This file is sourced by `hls_pipeline.sh` before each step — no environment variables need to be exported manually.
 
+### Local Overrides (`config.local.env`)
+
+`hls_pipeline.sh` automatically loads `config.local.env` from the repository root after `config.env`, if it exists. Any variable set in `config.local.env` overrides the same variable from `config.env`. Use it for machine-specific or project-specific settings without modifying the committed `config.env`:
+
+```bash
+# config.local.env — not committed to git (gitignored)
+BASE_DIR="/Volumes/MyDrive/HLS_Project"
+NUM_WORKERS=6
+SKIP_APPROVAL="TRUE"
+```
+
+This keeps your shared `config.env` clean and portable across collaborators or machines.
+
 For the full parameter reference, see the [Configuration Reference](configuration.md).
 
 ### Paths
@@ -479,7 +492,7 @@ Aggregates per-granule VI GeoTIFFs into per-tile time-series files.
 - **Inputs:** VI GeoTIFFs from `VI_OUTPUT_DIR`
 - **Outputs:** `T{TILE}_{VI}.nc` in `NETCDF_DIR` — CF-1.8 compliant with `days since 1970-01-01` time encoding and sensor (L30/S30) metadata per observation
 - **Parallelism:** Chunked writes with `multiprocessing.Pool`
-- **Southern hemisphere CRS correction:** HLS v2.0 GeoTIFFs for tiles south of the equator embed a UTM North zone (EPSG:326xx) with negative northings instead of the standard UTM South convention (EPSG:327xx, false_northing=10,000,000). Step 03 automatically detects this case (UTM North EPSG code + negative y centroid) and corrects it: the CRS is replaced with the UTM South equivalent (EPSG + 100) and y-coordinates are shifted by +10,000,000 m. The output NetCDF files carry the correct EPSG:327xx CRS with positive northings, as expected by GIS tools and CF-1.8 validators. This correction is applied transparently and logged with a `[CRS fix]` prefix in the pipeline output.
+- **Southern hemisphere CRS correction:** HLS v2.0 GeoTIFFs for tiles south of the equator embed a UTM North zone (EPSG:326xx) with negative northings instead of the standard UTM South convention (EPSG:327xx, false_northing=10,000,000). Step 03 automatically detects this case (UTM North EPSG code + negative y centroid) and corrects it: the CRS is replaced with the UTM South equivalent (EPSG + 100) and y-coordinates are shifted by +10,000,000 m. The output NetCDF files carry the correct EPSG:327xx CRS with positive northings, as expected by GIS tools and CF-1.8 validators. This correction is applied transparently and logged with a `[CRS]` prefix in the pipeline output.
 
 ### Step 04 — Temporal Mean + Reproject
 

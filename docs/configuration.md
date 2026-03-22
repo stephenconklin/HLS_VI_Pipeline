@@ -4,6 +4,20 @@ All pipeline parameters are defined in `config.env` at the repository root.
 `hls_pipeline.sh` sources this file before dispatching each step; Python scripts
 read values via `os.environ.get()` with per-parameter fallback defaults.
 
+## Local Overrides
+
+`hls_pipeline.sh` automatically loads `config.local.env` from the repository root
+after `config.env`, if the file exists. Any variable set there overrides the same
+variable from `config.env`. `config.local.env` is gitignored — use it for
+machine-specific paths, worker counts, or any setting you don't want committed:
+
+```bash
+# config.local.env
+BASE_DIR="/Volumes/MyDrive/HLS_Project"
+NUM_WORKERS=6
+SKIP_APPROVAL="TRUE"
+```
+
 ---
 
 ## Paths
