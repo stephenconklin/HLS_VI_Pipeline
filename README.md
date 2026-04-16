@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS-lightgrey.svg)]()
 [![Data: HLS v2.0](https://img.shields.io/badge/data-HLS%20v2.0-brightgreen.svg)](https://hls.gsfc.nasa.gov/)
-[![Data: NAIP](https://img.shields.io/badge/data-HLS%20v2.0-brightgreen.svg)](https://www.usgs.gov/centers/eros/science/usgs-eros-archive-aerial-photography-national-agriculture-imagery-program-naip)
+[![Data: NAIP](https://img.shields.io/badge/data-NAIP-brightgreen.svg)](https://www.usgs.gov/centers/eros/science/usgs-eros-archive-aerial-photography-national-agriculture-imagery-program-naip)
 [![Docs](https://readthedocs.org/projects/hls-vi-pipeline/badge/?version=latest)](https://hls-vi-pipeline.readthedocs.io/en/latest/overview.html)
 
 A production-ready, 11-step processing pipeline for computing and analyzing vegetation indices from NASA's Harmonized Landsat and Sentinel-2 (HLS) surface reflectance data. Built for researchers across ecology, agriculture, land management, and remote sensing who need reproducible, time-series vegetation analysis at scale.
